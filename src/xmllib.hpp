@@ -18,8 +18,9 @@
 #include <list>
 #include <cstring>
 #include <cassert>
-
+#include "stacked_exception.h"
 namespace boost {
+	// forward hash<Glib::ustring> to std::string's hash
 	template<>
 	struct hash<Glib::ustring> {
 		size_t operator()(const Glib::ustring& v) const {
@@ -59,10 +60,13 @@ namespace webpp { namespace xml {
 		}
 
 		virtual bool is_true() const {
-			throw std::runtime_error("webpp::xml::render_value<" + Glib::ustring(typeid(T).name()) + ">::is_true(): '" + output() + "' is not a boolean");
+			STACKED_EXCEPTIONS_ENTER();
+			throw std::runtime_error("render_value<" + Glib::ustring(typeid(T).name()) + ">::is_true(): '" + output() + "' is not a boolean");
+			STACKED_EXCEPTIONS_LEAVE("");
 		}
 	};
 	
+	// char literals are stored as Glib::ustring
 	template< std::size_t N >
 	class render_value<char[N]> : public render_value<Glib::ustring> {
 	public:
@@ -70,6 +74,7 @@ namespace webpp { namespace xml {
 			: render_value<Glib::ustring>(value) {}		
 	};
 
+	//! \brief Lazy evaluated function/lambda/bind/any callable. Will execute once requested from renderer and then value will be cached.
 	template <typename T>
 	class render_function : public render_value_base {
 		T lambda_;
@@ -114,6 +119,7 @@ namespace webpp { namespace xml {
 		std::shared_ptr<render_value_base> value_;
 
 	public:
+		//! \brief Find tree element stored under key in this subtree. Every key exists in tree, but only some of them have associated variables or arrays
 		render_context_tree_element& find(const Glib::ustring& key) {
 			if(key.empty()) 
 				return *this;
@@ -126,37 +132,45 @@ namespace webpp { namespace xml {
 			}
 		}
 	
+		//! \brief Get value stored under this tree element.
 		const render_value_base& value() const {
 			return *value_.get();
 		}
 
+		//! \brief Start iterating through array stored in this tree element
 		array_t::const_iterator begin() const {
 			return array_.begin();
 		}
 		
+		//! \brief Next-to-last element in array stored in this tree element
 		array_t::const_iterator end() const {
 			return array_.end();
 		}
 
+		//! \brief Store value of any type in this tree element.
 		template<typename T>
 		void put_value(const T& v) {
 			value_.reset(new render_value<T>(v));
 		}
 
+		//! \brief Store lazy evaluated callable in this tree element.
 		template<typename T>
 		void put_lambda(T&& v) {
 			value_.reset(new render_function<T>(std::forward<T>(v)));
 		}
 
+		//! \brief Add one element to array and return reference to it.
 		render_context_tree_element& add_to_array() {
 			array_.emplace_back();
 			return array_.back();
 		}
 
+		//! \brief Check if there is no value, no lambda and no array elements.
 		bool empty() const { 
 			return !value_ && array_.empty();
 		}
 
+		//! \brief Check if value or lambda is set.
 		bool has_value() {
 			return !!value_;
 		}
@@ -208,31 +222,32 @@ namespace webpp { namespace xml {
 
 
 	class context;
-
+// short macro for checking existance of variable in rendering context
 #define ctx_variable_check(tag, attribute, variablename, rndvalue) if(rndvalue.empty()) throw std::runtime_error((boost::format("webpp::xml::render_context(): variable '%s' required from <%s> at line %d, attribute %s, is missing") % variablename % tag->get_name() % tag->get_line() % attribute).str())
 
 	/// \brief Piece of html5/xml, which was rendered from fragment. Can be modified and then converted to ustring.
 	class fragment_output {
-		std::unique_ptr<xmlpp::Document> output_; // mutable, because to_string() is obviously const, and libxml++ thins different.
+		const Glib::ustring name_; // for exception decorating
+		std::unique_ptr<xmlpp::Document> output_; // mutable, because to_string() is obviously const, and libxml++ thinks different.
 	public:
 		/// \brief Construct empty document
-		fragment_output();
+		fragment_output(const Glib::ustring& name);
 		fragment_output(fragment_output&&);
 
 		/// \brief Find all nodes matching to XPath expression
 		//xmlpp::NodeSet find_by_xpath(const Glib::ustring& query) const;
 
+		//! \brief Convert XML tree to string
 		Glib::ustring to_string() const;
-
-		inline xmlpp::Document& document() { return *output_; } // FIXME!
 	private:
-
+		inline xmlpp::Document& document() { return *output_; }
 
 		friend class fragment;
 	};
 
 	/// \brief Piece of html5/xml, which is stored and then rendered using render_context and its values
 	class fragment : public boost::noncopyable {
+		const Glib::ustring name_;
 		context& context_;
 		xmlpp::DomParser reader_;
 	public:

@@ -1,11 +1,13 @@
 
 #include "../src/xmllib.hpp"
+#include "../src/stacked_exception.h"
 #include <cassert>
+
 
 #define tbegin(name) std::cout << name << std::endl
 #define tequal(a,b) if((a) != (b)) { std::cout << "\nFAIL: expected: " << b << "\nFAIL:   actual: " << a << std::endl; assert(false); }
 #define ttrue(a) assert(a)
-#define texcept(call, etype, emsg) try { (call); assert(false && "Expected exception " emsg ", but was not raised"); } catch(const etype& e) { tequal(e.what(), std::string(emsg)); }
+#define texcept(call, etype, emsg) try { (call); assert(false && "Expected exception " emsg ", but was not raised"); } catch(const etype& e) { std::cout << e.format(); tequal(e.what(), std::string(emsg)); }
 
 // test basic int and bool values
 void t1() {
@@ -20,7 +22,7 @@ void t1() {
 	ttrue(ctx.get("users..asdf.abuse").empty());
 	ttrue(!ctx.get(key).empty());
 	tequal(ctx.get(key).value().output(), "42");
-	texcept(ctx.get(key).value().is_true(), std::runtime_error, "webpp::xml::render_value<i>::is_true(): '42' is not a boolean");
+	texcept(ctx.get(key).value().is_true(), webpp::stacked_exception, "render_value<i>::is_true(): '42' is not a boolean");
 	key = "users.nolife.abuse";
 	ttrue(ctx.get(key).empty());
 
@@ -65,7 +67,7 @@ void t3() {
 	});
 
 	tequal(ctx.get(key).value().output(), "42");
-	texcept(ctx.get(key).value().is_true(), std::runtime_error, "webpp::xml::render_value<i>::is_true(): '42' is not a boolean");
+	texcept(ctx.get(key).value().is_true(), webpp::stacked_exception, "render_value<i>::is_true(): '42' is not a boolean");
 
 	key = "users.asdf.abuser";
 	ctx.lambda(key, []() { return true; });
@@ -112,7 +114,7 @@ void t6() {
 	ctx.put("testek", "<rootnode xmlns=\"webpp://xml\" xmlns:b=\"webpp://basic\"><b><b:render value=\"testval\"/></b></rootnode>");
 
 	// lets try it first without value
-	texcept(ctx.get("testek").render(rnd), std::runtime_error, "webpp::xml::taglib::tag_render: <render> at line 1 requires value 'testval' in render context");
+	texcept(ctx.get("testek").render(rnd), webpp::stacked_exception, "webpp::xml::taglib::tag_render: <render> at line 1 requires value 'testval' in render context");
 
 	// then, with some value
 	rnd.val("testval", "abuser<>");
@@ -139,7 +141,7 @@ void t6() {
 
 	// required attribute
 	ctx.put("testek4", "<rootnode xmlns=\"webpp://xml\" xmlns:b=\"webpp://basic\"><b><b:render format=\"%.3f\" value=\"testval2\" required=\"abuser\"/></b></rootnode>");
-	texcept(ctx.get("testek4").render(rnd), std::runtime_error, "webpp::xml::taglib::tag_render: <render> at line 1: required=\"true|false\", not 'abuser'");
+	texcept(ctx.get("testek4").render(rnd), webpp::stacked_exception, "webpp::xml::taglib::tag_render: <render> at line 1: required=\"true|false\", not 'abuser'");
 
 	ctx.put("testek4", "<rootnode xmlns=\"webpp://xml\" xmlns:b=\"webpp://basic\"><b><b:render format=\"%.3f\" value=\"testval3\" required=\"false\"/></b></rootnode>");
 	tequal(ctx.get("testek4").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode><b/></rootnode>\n");
@@ -155,19 +157,19 @@ void t7() {
 
 	// syntax error
 	ctx.put("testek", "<rootnode xmlns=\"webpp://xml\" xmlns:f=\"webpp://format\"><a f:href=\"#{user.name\"/></rootnode>");
-	texcept(ctx.get("testek").render(rnd), std::runtime_error, "#{ not terminated by }");
+	texcept(ctx.get("testek").render(rnd), webpp::stacked_exception, "#{ not terminated by }");
 
 	// bad format
 	ctx.put("testek", "<rootnode xmlns=\"webpp://xml\" xmlns:f=\"webpp://format\"><a f:href=\"#{user.name|}\"/></rootnode>");
-	texcept(ctx.get("testek").render(rnd), std::runtime_error, "empty format string");
+	texcept(ctx.get("testek").render(rnd), webpp::stacked_exception, "empty format string");
 
 	// missing variable
 	ctx.put("testek", "<rootnode xmlns=\"webpp://xml\" xmlns:f=\"webpp://format\"><a f:href=\"/users/#{user.name}\" f:title=\"user #{user.name} - abuse level #{user.abuse|%.2f}\"/></rootnode>");
-	texcept(ctx.get("testek").render(rnd), std::runtime_error, "output: required variable 'user.name' not found in render context");
+	texcept(ctx.get("testek").render(rnd), webpp::stacked_exception, "output: required variable 'user.name' not found in render context");
 
 	// missing second variable
 	rnd.val("user.name", "asdf");
-	texcept(ctx.get("testek").render(rnd), std::runtime_error, "format: required variable 'user.abuse' not found in render context");
+	texcept(ctx.get("testek").render(rnd), webpp::stacked_exception, "format: required variable 'user.abuse' not found in render context");
 
 	// everything set
 	rnd.val("user.abuse", M_PI);

@@ -2,12 +2,13 @@
 #define WEBPP_TAGLIB_HPP
 
 #include "xmllib.hpp"
-
+#include "stacked_exception.h"
 namespace webpp { namespace xml { namespace taglib {
 	/// <render value="..."(required) [default="text to insert, if value not found in render ctx", optional, defaults to ""] [required="false", if "false" and no value in ctx, use default value, optional, defaults to true] />
 	class tag_render : public tag {
 	public:
 		virtual void render(xmlpp::Element* dst, const xmlpp::Element* src, render_context& ctx) const {
+			STACKED_EXCEPTIONS_ENTER();
 			auto value = src->get_attribute("value");
 			if(!value)
 				throw std::runtime_error((boost::format("webpp::xml::taglib::tag_render: <render> at line %d requires value attribute") % src->get_line()).str());
@@ -39,6 +40,7 @@ namespace webpp { namespace xml { namespace taglib {
 				dst->add_child_text(defval);
 			else if(required)
 				throw std::runtime_error((boost::format("webpp::xml::taglib::tag_render: <render> at line %d requires value '%s' in render context") % src->get_line() % strvalue).str());
+			STACKED_EXCEPTIONS_LEAVE("");
 		}
 	};
 
@@ -52,6 +54,7 @@ namespace webpp { namespace xml { namespace taglib {
 		}
 
 		virtual void attribute(xmlpp::Element* dst, const xmlpp::Attribute* src, render_context& ctx) const {
+			STACKED_EXCEPTIONS_ENTER();
 			Glib::ustring source = src->get_value();
 			std::size_t last = 0, start;
 			std::ostringstream result;
@@ -85,6 +88,7 @@ namespace webpp { namespace xml { namespace taglib {
 			if(last != source.length())
 				result << source.substr(last);
 			dst->set_attribute(src->get_name(), result.str());
+			STACKED_EXCEPTIONS_LEAVE("attribute " + src->get_namespace_uri() + ":" + src->get_name());
 		}
 	};
 

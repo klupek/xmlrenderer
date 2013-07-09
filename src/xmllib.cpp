@@ -5,35 +5,43 @@
 
 #include <iostream>
 #include <libxml/xpath.h>
+#include "stacked_exception.h"
+
 namespace webpp { namespace xml { 
-	fragment_output::fragment_output()
-		: output_(new xmlpp::Document) {
+	fragment_output::fragment_output(const Glib::ustring& name)
+		: name_(name), output_(new xmlpp::Document) {
 
 	}
 
-	fragment_output::fragment_output(fragment_output&& orig) {
+	fragment_output::fragment_output(fragment_output&& orig) : name_(orig.name_) {
 		std::swap(output_, orig.output_);
 	}
 
 	Glib::ustring fragment_output::to_string() const {
+		STACKED_EXCEPTIONS_ENTER();
 		return output_->write_to_string();
+		STACKED_EXCEPTIONS_LEAVE("");
 	}
 
 
 	/// Load fragment from file 'filename', fragment name is filename
 	fragment::fragment(const Glib::ustring& filename, context& ctx)
-		: context_(ctx) {
+		: name_(filename), context_(ctx) {
+		STACKED_EXCEPTIONS_ENTER();
 		reader_.set_substitute_entities(false);
 		reader_.set_validate(false);
 		reader_.parse_file(filename);
+		STACKED_EXCEPTIONS_LEAVE("parsing file '" + filename + "'");
 	}
 
 	/// Load fragment name 'name' from in-memory 'buffer'
 	fragment::fragment(const Glib::ustring& name, const Glib::ustring& buffer, context& ctx)
-		: context_(ctx) {
+		: name_(name), context_(ctx) {
+		STACKED_EXCEPTIONS_ENTER();
 		reader_.set_substitute_entities(false);
 		reader_.set_validate(false);
 		reader_.parse_memory(buffer);
+		STACKED_EXCEPTIONS_LEAVE("parsing memory buffer named '" + name + "':<<XML\n" + buffer + "\nXML\n");
 	}
 
 	/// Return all nodes in fragment, matching given XPath expression
@@ -43,13 +51,15 @@ namespace webpp { namespace xml {
 */
 
 	fragment_output fragment::render(render_context& rnd) {
-		fragment_output result;
+		STACKED_EXCEPTIONS_ENTER();
+		fragment_output result(name_);
 		xmlpp::Document& output = result.document();
 		xmlpp::Element* src = reader_.get_document()->get_root_node();
 		output.create_root_node(src->get_name());
 		xmlpp::Element* dst = output.get_root_node();
 		process_node(src, dst, rnd);
 		return result;
+		STACKED_EXCEPTIONS_LEAVE("fragment '" + name_ + "'");
 	}		
 
 	/// Construct context; library_directory is directory root for fragment XML files
@@ -59,16 +69,21 @@ namespace webpp { namespace xml {
 
 	/// Load fragment 'name' from file in library
 	void context::load(const std::string& name) {
+		STACKED_EXCEPTIONS_ENTER();
 		fragments_.emplace(name, std::make_shared<fragment>( (library_directory_ / name).string(), *this));
+		STACKED_EXCEPTIONS_LEAVE("loading file " + name);
 	}
 
 	/// Load fragment 'name' from in-memory buffer 'data'
 	void context::put(const Glib::ustring& name, const Glib::ustring& data) {
+		STACKED_EXCEPTIONS_ENTER();
 		fragments_[name] = std::make_shared<fragment>( name, data, *this);
+		STACKED_EXCEPTIONS_LEAVE("loading memory buffer " + name);
 	}
 
 	/// find fragment by 'name', load it from library if not loaded yet.
 	fragment& context::get(const Glib::ustring& name) {
+		STACKED_EXCEPTIONS_ENTER();
 		auto i = fragments_.find(name);
 		if(i == fragments_.end()) {
 			load(name);
@@ -79,6 +94,7 @@ namespace webpp { namespace xml {
 			throw std::runtime_error("webpp::xml::context::get(): required fragment '" + name + "' not found");
 		else
 			return *i->second;
+		STACKED_EXCEPTIONS_LEAVE("fragment name " + name);
 	}
 
 	/// get render context variable
@@ -109,6 +125,7 @@ namespace webpp { namespace xml {
 
 
 	void fragment::process_node(const xmlpp::Element* src, xmlpp::Element* dst, render_context& rnd) {
+		STACKED_EXCEPTIONS_ENTER();
 		// first, check tag type(namespace)
 		if(src->get_namespace_uri() == "webpp://html5" || src->get_namespace_uri() == "webpp://xml") {
 			// normal tag, process attributes
@@ -219,9 +236,11 @@ namespace webpp { namespace xml {
 			}
 			tag->render(parent, src, rnd);
 		} // // if tagns == webpp://html5 or webpp://xml
+		STACKED_EXCEPTIONS_LEAVE("node " + src->get_namespace_uri() + ":" + src->get_name() + " at line " + boost::lexical_cast<std::string>(src->get_line()));
 	}
 
 	void fragment::process_children(const xmlpp::Element* src, xmlpp::Element* dst, render_context& rnd) {
+		STACKED_EXCEPTIONS_ENTER();
 		for(auto child : src->get_children()) {
 			const xmlpp::Element* childelement = dynamic_cast<xmlpp::Element*>(child);
 			if(childelement != nullptr) {
@@ -231,6 +250,7 @@ namespace webpp { namespace xml {
 				dst->import_node(src);
 			} // if childelement != nullptr
 		}
+		STACKED_EXCEPTIONS_LEAVE("");
 	}
 
 
