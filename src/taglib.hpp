@@ -41,101 +41,59 @@ namespace webpp { namespace xml { namespace taglib {
 				throw std::runtime_error((boost::format("webpp::xml::taglib::tag_render: <render> at line %d requires value '%s' in render context") % src->get_line() % strvalue).str());
 		}
 	};
-/*
-	/// <a href.render="user.profilelink">...</a>
-	/// <a href.render="user.nick" href.format="/users/%s" [ href.default="anonymous", defaults to "", optional ] [ required="false", defaults to true, optional ]>...</a>
-	class subattribute_render : public subattribute {
+
+	/*! \brief XMLNS handler for formatting attributes
+	 *  \\example <a f:href="/users/#{user.name}" f:title="user #[user.name} - abuse level #{user.abuse|%.2f]">
+	 */
+	class format_xmlns : public xmlns {
 	public:
-		virtual std::wstring render(std::map<std::string, std::wstring>& attributes, const render_context& ctx) const {
-			auto rnd = attributes.find("render"); // this attribute name			
-			std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> conv;
-			const std::string rndval = conv.to_bytes(rnd->second);
-			attributes.erase(rnd);
-			auto fmt = attributes.find("format");
-			auto req = attributes.find("required");
-			auto dfl = attributes.find("default");
-			bool required = true;
-			std::wstring defval;
-			if(req != attributes.end()) {
-				if(req->second == L"false")
-					required = false;
-				else if(req->second != L"true")
-					throw std::runtime_error((boost::format("webpp::xml::taglib::tag_render: attribute .render required=\"true|false\", not '%s'") % *req).str());
-				attributes.erase(req);
-			}
-			if(dfl != attributes.end()) {
-				defval = dfl->second;
-				attributes.erase(dfl);
-			}
-
-			
-			auto ctxval = ctx.get(rndval, required);
-			if(ctxval) {
-				if(fmt != attributes.end()) {
-					const std::wstring fmtstr = fmt->second;
-					attributes.erase(fmt);
-					return ctxval->format(fmtstr);
-				} else
-					return ctxval->output();
-			} else {
-				return defval;
-			}
-		}
-	};
-*/
-	struct basic {
-		template<typename TagsT, typename SubattributesT>
-		static void process(TagsT& tags, SubattributesT& subattributes) {
-			tags[std::make_pair(std::string("webpp://basic"), std::string("render"))].reset(new tag_render);
-//			subattributes.emplace("render", new attribute_render);
-		}
-	};
-	
-
-/*
-
-	// renderables 
-	class renderable_base {
-	public:
-		virtual std::wstring render(std::list<std::string> filters) const = 0;
-	};
-
-	class string : public renderable_base {
-		std::wstring value_;
-	public:
-		string(const std::string& value, const std::string& encoding) {
-			std::wstring_convert<std::codecvt_byname<char, wchar_t, std::mbstate_t>> conv(encoding);
-			value_ = conv.from_bytes(value);
+		virtual void tag(xmlpp::Element* /*dst*/, const xmlpp::Element* /* src */, render_context& /* ctx */ ) const {
+			throw std::runtime_error("tag() is not implemented in this xmlns");
 		}
 
-		virtual std::wstring render(std::list<std::string> filters) const {
-			std::wstring value = value_;
-			for(auto i : filters)
-				value = filter_base<std::wstring>::find(i).filter(value);
-			return value;
-		}
-	};
+		virtual void attribute(xmlpp::Element* dst, const xmlpp::Attribute* src, render_context& ctx) const {
+			Glib::ustring source = src->get_value();
+			std::size_t last = 0, start;
+			std::ostringstream result;
+			while(start = source.find("#{", last), start != Glib::ustring::npos) {
+				if(start != last)
+					result << source.substr(last, start-last);
 
-	template<typename T>
-	class renderable : public renderable_base {
-		T obj_;
-	public:
-		renderable(const T& object)
-			: obj_(object) {}
-
-		virtual std::wstring render(std::list<std::string> filters) const {
-			if(filters.empty())
-				return boost::lexical_cast<std::wstring>(obj_);
-			else {
-				auto i = filters.begin();
-				std::wstring value = filter_base<T>::find(*i).filter(obj_);
-				for(++i; i != filters.end(); ++i) {
-					value = filter_base<std::wstring>::find(*i).filter(value);
+				auto pipe = source.find('|', start+1), end = source.find('}', start+1);
+				if(end == Glib::ustring::npos) {
+					throw std::runtime_error("#{ not terminated by }");
 				}
-				return value;
+				if(pipe != Glib::ustring::npos && pipe < end) {
+					auto variable = source.substr(start+2, pipe - start-2);
+					auto format = source.substr(pipe+1, end-pipe-1);
+					if(format.empty()) {
+						throw std::runtime_error("empty format string");
+					}
+					auto var = ctx.get(variable);
+					if(!var.has_value())
+						throw std::runtime_error("format: required variable '" + variable + "' not found in render context");
+					result << var.value().format(format);
+				} else {
+					auto variable = source.substr(start+2, end-start-2);
+					auto var = ctx.get(variable);
+					if(!var.has_value())
+						throw std::runtime_error("output: required variable '" + variable + "' not found in render context");
+					result << var.value().output();
+				}
+				last = end+1;
 			}
+			if(last != source.length())
+				result << source.substr(last);
+			dst->set_attribute(src->get_name(), result.str());
 		}
 	};
-*/
+
+	struct basic {
+		template<typename TagsT, typename XmlnsesT>
+		static void process(TagsT& tags, XmlnsesT& xmlnses) {
+			tags[std::make_pair(Glib::ustring("webpp://basic"), Glib::ustring("render"))].reset(new tag_render);
+			xmlnses["webpp://format"].reset(new format_xmlns);
+		}
+	};
 }}}
 #endif // WEBPP_TAGLIB_HPP

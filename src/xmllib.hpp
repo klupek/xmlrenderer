@@ -19,10 +19,15 @@
 #include <cstring>
 #include <cassert>
 
-/* zalozenia:
-	- nazwy tagów i atrybutów sa czystym ascii, bez udziwnien i ogonków
-	- zawartosc nodow i atrybutow jest parsowana jako unicode
-*/
+namespace boost {
+	template<>
+	struct hash<Glib::ustring> {
+		size_t operator()(const Glib::ustring& v) const {
+			return hash<std::string>()(v);
+		}
+	};
+}
+
 namespace webpp { namespace xml {
 
 	/// abstract interface for values in render context
@@ -54,7 +59,7 @@ namespace webpp { namespace xml {
 		}
 
 		virtual bool is_true() const {
-			throw std::runtime_error("webpp::xml::render_value<" + std::string(typeid(T).name()) + ">::is_true(): '" + output() + "' is not a boolean");
+			throw std::runtime_error("webpp::xml::render_value<" + Glib::ustring(typeid(T).name()) + ">::is_true(): '" + output() + "' is not a boolean");
 		}
 	};
 	
@@ -102,19 +107,19 @@ namespace webpp { namespace xml {
 
 	/// \brief Key-[Array|Value] tree, each node may be one of: empty (transitive node), value (of any type), array of subtrees
 	class render_context_tree_element {
-		typedef boost::unordered_map<std::string, render_context_tree_element> children_t;
+		typedef boost::unordered_map<Glib::ustring, render_context_tree_element> children_t;
 		mutable children_t children_;
 		typedef std::list<render_context_tree_element> array_t;
 		array_t array_;
 		std::shared_ptr<render_value_base> value_;
 
 	public:
-		render_context_tree_element& find(const std::string& key) {
+		render_context_tree_element& find(const Glib::ustring& key) {
 			if(key.empty()) 
 				return *this;
 			else {
 				const auto position = key.find('.');
-				if(position == std::string::npos)
+				if(position == Glib::ustring::npos)
 					return children_[key.substr(0, position)];
 				else
 					return children_[key.substr(0, position)].find(key.substr(position+1));
@@ -165,39 +170,39 @@ namespace webpp { namespace xml {
 	public:
 		/// store value (copied) under key
 		template<typename T>
-		render_context& val(const std::string& key, const T& value) {
+		render_context& val(const Glib::ustring& key, const T& value) {
 			root_.find(key).put_value(value);
 			return *this;
 		}
 
 		/// store reference under key, reference must be valid during rendering
 		template<typename T>
-		render_context& ref(const std::string& key, const T& value) {
+		render_context& ref(const Glib::ustring& key, const T& value) {
 			root_.find(key).put_value(value);
 			return *this;
 		}
 
 		/// store lazy evaulated lambda under key, any lambda reference captures must be valid during rendering
 		template<typename T>
-		render_context& lambda(const std::string& key, T&& value) {
+		render_context& lambda(const Glib::ustring& key, T&& value) {
 			root_.find(key).put_lambda(std::forward<T>(value));
 			return *this;
 		}
 
 		/// copy subtree to new key
-		void put(const std::string& key, const render_context_tree_element& subtree) {
+		void put(const Glib::ustring& key, const render_context_tree_element& subtree) {
 			root_.find(key) = subtree;
 		}
 		
 		/// add to array
 		template<typename T>
-		render_context& add_to_array(const std::string& key, const T& value) {
+		render_context& add_to_array(const Glib::ustring& key, const T& value) {
 			root_.find(key).add_to_array().put_value(value);
 			return *this;
 		}
 
 		/// find by name, descend from root_
-		const render_context_tree_element& get(const std::string& key);
+		const render_context_tree_element& get(const Glib::ustring& key);
 	};
 
 
@@ -215,7 +220,7 @@ namespace webpp { namespace xml {
 		fragment_output(fragment_output&&);
 
 		/// \brief Find all nodes matching to XPath expression
-		//xmlpp::NodeSet find_by_xpath(const std::string& query) const;
+		//xmlpp::NodeSet find_by_xpath(const Glib::ustring& query) const;
 
 		Glib::ustring to_string() const;
 
@@ -232,10 +237,10 @@ namespace webpp { namespace xml {
 		xmlpp::DomParser reader_;
 	public:
 		/// \brief Load fragment from file 'filename'
-		fragment(const std::string& filename, context& ctx);
+		fragment(const Glib::ustring& filename, context& ctx);
 		
 		/// \brief Load fragment from string 'buffer'
-		fragment(const std::string& name, const Glib::ustring& buffer, context& ctx);
+		fragment(const Glib::ustring& name, const Glib::ustring& buffer, context& ctx);
 		
 		fragment(const fragment&) = delete;
 		fragment& operator=(const fragment&) = delete;
@@ -244,21 +249,19 @@ namespace webpp { namespace xml {
 		fragment_output render(render_context& rnd);
 	private:
 		// list of modifiers for single attribute
-		typedef std::map<std::string, std::string> modifier_list_t;
+		typedef std::map<Glib::ustring, Glib::ustring> modifier_list_t;
 		// list of attribute with modifiers
-		typedef std::map<std::string, modifier_list_t> modifier_map_t;
+		typedef std::map<Glib::ustring, modifier_list_t> modifier_map_t;
 
 		/// \brief Process node 'src' and its children, put generated output into 'dst'
 		void process_node(const xmlpp::Element* src, xmlpp::Element* dst, render_context& rnd);
-		/// \brief Process subattributes in 'src' into destination node 'dst'
-		void process_subattributes(modifier_map_t& src, xmlpp::Element* dst, render_context& rnd);
 		/// \brief Process children of 'src' and put generated output as children of 'dst
 		void process_children(const xmlpp::Element* src, xmlpp::Element* dst, render_context& rnd); 
 	};
 	
 	
 	/*! \brief Handler for custom XML tags
-	 * 	\example <f:input f:name="user.name" />
+	 * 	\example <f:input name="user.name" />
 	 */
 	class tag {
 	public:
@@ -266,16 +269,15 @@ namespace webpp { namespace xml {
 		virtual void render(xmlpp::Element* dst, const xmlpp::Element* src, render_context& ctx) const = 0;
 	};
 
-	/*! \brief Handler for subattributes (see example)
-	 *  \example <a href.render="user.nickname" href.format="/users/%s"> (render is subattribute, format is consumed by render)
+	/*! \brief Handle all attributes and tags in namespace
+	 *  \example <a f:href="/users/#{user.name}" f:title="user #[user.name} - abuse level #{user.abuse|%.2f]">
 	 */
-	class subattribute {
+	class xmlns {
 	public:
-		/*! \brief process subattribute, consume one (subattribute name) or more (optional) subattributes, return rendered value for subattributed attribute
-		 * 	\param attributes subattribute name -> subattribute value map
-		 * 	\param ctx rendering context
-		 */
-		virtual Glib::ustring render(std::map<std::string, std::string>& attributes, const render_context& ctx) const = 0;
+		/// Process tag 'src' and place result as child element in 'dst'
+		virtual void tag(xmlpp::Element* dst, const xmlpp::Element* src, render_context& ctx) const = 0;
+		/// Process attribute 'src' and place results (attributes) inside element 'dst'
+		virtual void attribute(xmlpp::Element* dst, const xmlpp::Attribute* src, render_context& ctx) const = 0;
 	};
 
 	/*! \class context
@@ -283,11 +285,11 @@ namespace webpp { namespace xml {
 	 */
 	class context {
 		const boost::filesystem::path library_directory_;
-		boost::unordered_map<std::string, std::shared_ptr<fragment> > fragments_;
+		boost::unordered_map<Glib::ustring, std::shared_ptr<fragment> > fragments_;
 		/// <wpp:foobar ... />
-		boost::unordered_map<std::pair<std::string,std::string>, std::unique_ptr<tag> > tags_;
+		boost::unordered_map<std::pair<Glib::ustring,Glib::ustring>, std::unique_ptr<tag> > tags_;
 		/// <a href.value="variable-name" href.format="%.3lf">
-		boost::unordered_map<std::string, std::unique_ptr<subattribute>> subattributes_;
+		boost::unordered_map<Glib::ustring, std::unique_ptr<xmlns>> xmlnses_;
 		
 	public:		
 		/*! \brief Construct context
@@ -303,25 +305,25 @@ namespace webpp { namespace xml {
 		 * 	\param name fragment name
 		 * 	\param data string containing XML data
 		 */					
-		void put(const std::string& name, const std::string& data);
+		void put(const Glib::ustring& name, const Glib::ustring& data);
 
 		/// \brief Load tag library _Tgt
 		template<typename _Tgt>
 		void load_taglib() {
-			_Tgt::process(tags_, subattributes_);
+			_Tgt::process(tags_, xmlnses_);
 		}
 
 		/// \brief Find or load fragment named 'name', throw exception if not found
-		fragment&  get(const std::string& name);
+		fragment&  get(const Glib::ustring& name);
 
-		/*! \brief Find tag object named 'name' in 'ns' namespace, returns nullptr if not found
+		/*! \brief Find tag handler named 'name' in 'ns' namespace, returns nullptr if not found
 		 * 	\param ns namespace URI
 		 * 	\param name tag name
 		 */		
-		const tag* find_tag(const std::string& ns, const std::string& name);
+		const tag* find_tag(const Glib::ustring& ns, const Glib::ustring& name);
 		
-		/// \brief Find subattribute named 'name', returns nullptr if not found
-		const subattribute* find_subattribute(const std::string& name);
+		/// \brief Find xmlns handler for uri 'ns', returns nullptr if not found
+		const xmlns* find_xmlns(const Glib::ustring& ns);
 	};
 }}
 
