@@ -1,0 +1,8 @@
+#!/bin/bash
+
+g++ -std=c++11 -fprofile-arcs -ftest-coverage -o test1 $(pkg-config --cflags libxml++-2.6) ../src/*.cpp ../tests/*.cpp  -lboost_system -lboost_filesystem -lglibmm-2.4 -lxml++-2.6 \
+	&& ./test1 \
+	&& lcov --base-directory . --directory . -c -o test.info \
+	&& genhtml -o html/  test.info 
+	
+
