@@ -11,7 +11,7 @@ namespace webpp { namespace xml { namespace taglib {
 			STACKED_EXCEPTIONS_ENTER();
 			auto value = src->get_attribute("value");
 			if(!value)
-				throw std::runtime_error((boost::format("webpp::xml::taglib::tag_render: <render> at line %d requires value attribute") % src->get_line()).str());
+				throw std::runtime_error("<render> requires value attribute");
 			auto strvalue = value->get_value();
 			auto fmt = src->get_attribute("format");
 			auto req = src->get_attribute("required");
@@ -39,7 +39,7 @@ namespace webpp { namespace xml { namespace taglib {
 			} else if(!defval.empty()) 
 				dst->add_child_text(defval);
 			else if(required)
-				throw std::runtime_error((boost::format("webpp::xml::taglib::tag_render: <render> at line %d requires value '%s' in render context") % src->get_line() % strvalue).str());
+				throw std::runtime_error((boost::format("<render> requires value '%s' in render context") % strvalue).str());
 			STACKED_EXCEPTIONS_LEAVE("");
 		}
 	};

@@ -124,118 +124,138 @@ namespace webpp { namespace xml {
 	}
 
 
-	void fragment::process_node(const xmlpp::Element* src, xmlpp::Element* dst, render_context& rnd) {
+	void fragment::process_node(const xmlpp::Element* src, xmlpp::Element* dst, render_context& rnd, bool already_processing_outer_repeat) {
 		STACKED_EXCEPTIONS_ENTER();
-		// first, check tag type(namespace)
-		if(src->get_namespace_uri() == "webpp://html5" || src->get_namespace_uri() == "webpp://xml") {
-			// normal tag, process attributes
-			Glib::ustring repeat_variable, repeat_array;
-			enum { inner, outer,none } repeat_type = none;
-			bool visible = true;
 
-			for(auto attribute : src->get_attributes()) {
-				const auto ns = attribute->get_namespace_uri();
-				const auto name = attribute->get_name();
-				const auto value = attribute->get_value();
-				
-				if(ns == "") /* default namespace, attributes in XML do NOT HAVE default namespace set via xmlns= in root node */ {
-					// normal attribute
-					dst->set_attribute(name, value);
-				} else if(ns == "webpp://control") {
-					// control statements, loops and conditions
-					// foreach loops, outer repeats whole tag and children, inner repeats children only
-					if(name == "repeat") {
-						if(value == "inner") 
-							repeat_type = inner;
-						else if(value == "outer")
-							repeat_type = outer;
-						else
-							throw std::runtime_error(
-								(boost::format("webpp::xml::fragment::process_node(): repeat must be one of (inner,outer), not '%s' in line '%s', tag '%s'") 
-									% value % src->get_line() % src->get_name()).str());
-					} else if(name == "repeat-array") {
-						repeat_array = value;
-					} else if(name == "repeat-variable") {
-						repeat_variable = value;
-					// element visibility
-					} else if(name == "if-exists") {
-						const auto val = rnd.get(value);
-						visible &= (!val.empty());
-					} else if(name == "if-not-exists") {
-						const auto val = rnd.get(value);
-						visible &= val.empty();
-					} else if(name == "if-true") {
-						const auto val = rnd.get(value);
-						ctx_variable_check(src, name, value, val);
-						visible &= val.value().is_true();
-					} else if(name == "if-not-true") {
-						const auto val = rnd.get(value);
-						ctx_variable_check(src, name, value, val);
-						visible &= !val.value().is_true();
-					} else
-						throw std::runtime_error("webpp::xml::fragment::process_node(): webpp://control atribute " + name + " is not implemented");
-				} else { // if ns == webpp://control
-					const xmlns* nshandler = context_.find_xmlns(ns);
-					if(nshandler == nullptr)
-						throw std::runtime_error("webpp::xml::fragment::process_node(): unknown attribute namespace  " + ns);
+		Glib::ustring repeat_variable, repeat_array;
+		enum { inner, outer,none } repeat_type = none;
+		bool visible = true;
 
-					nshandler->attribute(dst, attribute, rnd);
-				}
-			} // foreach attribute
+		// process control attributes first
+		for(auto attribute : src->get_attributes()) {
+			const auto ns = attribute->get_namespace_uri();
+			const auto name = attribute->get_name();
+			const auto value = attribute->get_value();
 
-			// check for visibility, if not visible, no further actions about this src tag should be taken
-			if(!visible) {
-				auto parent = dst->get_parent();
-				if(parent == nullptr)
-					throw std::runtime_error("webpp::xml::fragment::process_node(): response resulted in empty document");
-				else
-					parent->remove_child(dst);
-			} else { // this is visible, lets process children
-				if(repeat_type == none) {
-					process_children(src, dst, rnd);
-				} else if(repeat_type == inner) {
-					// repeat_variable, repeat_array;						
-					if(repeat_variable.empty() || repeat_array.empty())
-						throw std::runtime_error("repeat attribute set, but repeat_variable or repeat_array is not set");
-
-					const auto array = rnd.get(repeat_array);
-					for(auto i : array) {
-						rnd.put(repeat_variable, i);
-						process_children(src, dst, rnd);
-					}
-				} else { // repeat_type == outer 
-					// repeat_variable, repeat_array;						
-					if(repeat_variable.empty() || repeat_array.empty())
-						throw std::runtime_error("repeat attribute set, but repeat_variable or repeat_array is not set");
-					// we need to repeat whole xml element
-					xmlpp::Element* currentdst = dst;
-					const auto array = rnd.get(repeat_array);
-					for(auto i = array.begin(); i != array.end();) {
-						// first setup context variable
-						rnd.put(repeat_variable, *i);
-						// move to next source array element, if it is not end, then add next sibling
-						++i;
-						if(i != array.end())
-							currentdst = currentdst->get_parent()->add_child(src->get_name());
-					}
-				} // if repeat_type 
-			} // if visible
-		} else { // if tagns == webpp://html5 or webpp://xml
-			// look for pair(tagns,tagname) handler
-
-			auto parent = dst->get_parent();
-			parent->remove_child(dst);
-
-			auto tag = context_.find_tag(src->get_namespace_uri(), src->get_name());
-			if(tag == nullptr) {
-				const xmlns* nshandler = context_.find_xmlns(src->get_namespace_uri());
-				if(!nshandler)
-					throw std::runtime_error( (boost::format("webpp::xml::fragmet::process_node(): required custom tag %s in ns %s (or namespace handler) not found") % src->get_name() % src->get_namespace_uri()).str());
-
-				nshandler->tag(parent, src, rnd);
+			if(ns == "webpp://control") {
+				// control statements, loops and conditions
+				// foreach loops, outer repeats whole tag and children, inner repeats children only
+				if(name == "repeat") {
+					if(value == "inner")
+						repeat_type = inner;
+					else if(value == "outer")
+						repeat_type = outer;
+					else
+						throw std::runtime_error(
+							(boost::format("repeat must be one of (inner,outer), not '%s' in line '%s', tag '%s'")
+								% value % src->get_line() % src->get_name()).str());
+				} else if(name == "repeat-array") {
+					repeat_array = value;
+				} else if(name == "repeat-variable") {
+					repeat_variable = value;
+				// element visibility
+				} else if(name == "if-exists") {
+					const auto val = rnd.get(value);
+					visible &= (!val.empty());
+				} else if(name == "if-not-exists") {
+					const auto val = rnd.get(value);
+					visible &= val.empty();
+				} else if(name == "if-true") {
+					const auto val = rnd.get(value);
+					ctx_variable_check(src, name, value, val);
+					visible &= val.value().is_true();
+				} else if(name == "if-not-true") {
+					const auto val = rnd.get(value);
+					ctx_variable_check(src, name, value, val);
+					visible &= !val.value().is_true();
+				} else
+					throw std::runtime_error("webpp://control atribute " + name + " is not implemented");
 			}
-			tag->render(parent, src, rnd);
-		} // // if tagns == webpp://html5 or webpp://xml
+		} // foreach attribute
+
+		if(already_processing_outer_repeat && repeat_type == outer)
+			repeat_type = none;
+
+		if(!visible) {
+			auto parent = dst->get_parent();
+			if(parent == nullptr)
+				throw std::runtime_error("response resulted in empty document");
+			else
+				parent->remove_child(dst);
+		} else if(repeat_type != outer) {
+			// element is visible AND it is not outer repeat
+			if(src->get_namespace_uri() == "webpp://html5" || src->get_namespace_uri() == "webpp://xml") {
+				// normal tag, process attributes
+				// and every other attribute then
+				for(auto attribute : src->get_attributes()) {
+					const auto ns = attribute->get_namespace_uri();
+					const auto name = attribute->get_name();
+					const auto value = attribute->get_value();
+
+					if(ns == "") /* default namespace, attributes in XML do NOT HAVE default namespace set via xmlns= in root node */ {
+						// normal attribute
+						dst->set_attribute(name, value);
+					} else if(ns != "webpp://control"){ // if ns == webpp://control
+						const xmlns* nshandler = context_.find_xmlns(ns);
+						if(nshandler == nullptr)
+							throw std::runtime_error("unknown attribute namespace  " + ns);
+						nshandler->attribute(dst, attribute, rnd);
+					}
+				}
+			} else {
+				// look for pair(tagns,tagname) handler
+
+				auto parent = dst->get_parent();
+				parent->remove_child(dst);
+
+				auto tag = context_.find_tag(src->get_namespace_uri(), src->get_name());
+				if(tag == nullptr) {
+					const xmlns* nshandler = context_.find_xmlns(src->get_namespace_uri());
+					if(!nshandler)
+						throw std::runtime_error( (boost::format("required custom tag %s in ns %s (or namespace handler) not found") % src->get_name() % src->get_namespace_uri()).str());
+
+					nshandler->tag(parent, src, rnd);
+				}
+				tag->render(parent, src, rnd);
+			}
+
+			if(repeat_type == none) {
+				process_children(src, dst, rnd);
+			} else /* if(repeat_type == inner) */ {
+				// repeat_variable, repeat_array;
+				if(repeat_variable.empty() || repeat_array.empty())
+					throw std::runtime_error("repeat attribute set, but repeat_variable or repeat_array is not set");
+
+				const auto array = rnd.get(repeat_array);
+				for(auto i : array) {
+					rnd.put(repeat_variable, i);
+					process_children(src, dst, rnd);
+				}
+			}
+		} else { // repeat_type == outer
+			if(src->get_parent() == nullptr)
+				throw std::runtime_error("outer repeat on root element is not possible");
+			// repeat_variable, repeat_array;
+			if(repeat_variable.empty() || repeat_array.empty())
+				throw std::runtime_error("repeat attribute set, but repeat_variable or repeat_array is not set");
+			// we need to repeat whole xml element
+			const auto array = rnd.get(repeat_array);
+			if(array.empty())
+				dst->get_parent()->remove_child(dst);
+			else {
+				xmlpp::Element* currentdst = dst;
+
+				for(auto i = array.begin(); i != array.end();) {
+					// first setup context variable
+					rnd.put(repeat_variable, *i);
+					process_node(src, currentdst, rnd, true);
+					// move to next source array element, if it is not end, then add next sibling
+					++i;
+					if(i != array.end())
+						currentdst = currentdst->get_parent()->add_child(src->get_name());
+				}
+			}
+		} // if repeat_type
 		STACKED_EXCEPTIONS_LEAVE("node " + src->get_namespace_uri() + ":" + src->get_name() + " at line " + boost::lexical_cast<std::string>(src->get_line()));
 	}
 
@@ -247,7 +267,7 @@ namespace webpp { namespace xml {
 				xmlpp::Element* e = dst->add_child(child->get_name());				
 				process_node(childelement, e, rnd);
 			} else {
-				dst->import_node(src);
+				dst->import_node(child);
 			} // if childelement != nullptr
 		}
 		STACKED_EXCEPTIONS_LEAVE("");

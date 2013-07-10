@@ -12,6 +12,7 @@
 #include <boost/algorithm/string.hpp>
 #include <type_traits>
 #include <cstdarg>
+#include <iomanip>
 #include <fstream>
 #include <functional>
 #include <memory>
@@ -171,8 +172,29 @@ namespace webpp { namespace xml {
 		}
 
 		//! \brief Check if value or lambda is set.
-		bool has_value() {
+		bool has_value() const {
 			return !!value_;
+		}
+
+		void debug(int tab = 0) const {
+			if(has_value())
+				std::cout << std::setw(tab*5) << "" <<  ".: " << value_->output() << std::endl;
+			else
+				std::cout << std::setw(tab*5) << "" << ".: (null)" << std::endl;
+			if(begin() != end()) {
+				std::cout << std::setw(tab*5) << "" << "array elements\n";
+				for(auto e : *this) {
+					e.debug(tab+1);
+				}
+			}
+
+			if(!children_.empty()) {
+				std::cout << std::setw(tab*5) << "" << "children\n";
+				for(auto child : children_) {
+					std::cout << std::setw((tab+1)*5) << ""<< "child " << child.first << ":\n";
+					child.second.debug(tab+2);
+				}
+			}
 		}
 	};
 
@@ -205,14 +227,19 @@ namespace webpp { namespace xml {
 
 		/// copy subtree to new key
 		void put(const Glib::ustring& key, const render_context_tree_element& subtree) {
+		//	std::cout << "subtree = \n";
+			//subtree.debug();
+			//std::cout << "root before = \n";
+			//root_.debug();
 			root_.find(key) = subtree;
+			//std::cout << "root after = \n";
+			//root_.debug();
+
 		}
 		
 		/// add to array
-		template<typename T>
-		render_context& add_to_array(const Glib::ustring& key, const T& value) {
-			root_.find(key).add_to_array().put_value(value);
-			return *this;
+		render_context_tree_element& add_to_array(const Glib::ustring& key) {
+			return root_.find(key).add_to_array();
 		}
 
 		/// find by name, descend from root_
@@ -223,7 +250,7 @@ namespace webpp { namespace xml {
 
 	class context;
 // short macro for checking existance of variable in rendering context
-#define ctx_variable_check(tag, attribute, variablename, rndvalue) if(rndvalue.empty()) throw std::runtime_error((boost::format("webpp::xml::render_context(): variable '%s' required from <%s> at line %d, attribute %s, is missing") % variablename % tag->get_name() % tag->get_line() % attribute).str())
+#define ctx_variable_check(tag, attribute, variablename, rndvalue) if(rndvalue.empty()) throw std::runtime_error((boost::format("variable '%s' required from <%s> at line %d, attribute %s, is missing") % variablename % tag->get_name() % tag->get_line() % attribute).str())
 
 	/// \brief Piece of html5/xml, which was rendered from fragment. Can be modified and then converted to ustring.
 	class fragment_output {
@@ -269,7 +296,7 @@ namespace webpp { namespace xml {
 		typedef std::map<Glib::ustring, modifier_list_t> modifier_map_t;
 
 		/// \brief Process node 'src' and its children, put generated output into 'dst'
-		void process_node(const xmlpp::Element* src, xmlpp::Element* dst, render_context& rnd);
+		void process_node(const xmlpp::Element* src, xmlpp::Element* dst, render_context& rnd, bool already_processing_outer_repeat = false);
 		/// \brief Process children of 'src' and put generated output as children of 'dst
 		void process_children(const xmlpp::Element* src, xmlpp::Element* dst, render_context& rnd); 
 	};
