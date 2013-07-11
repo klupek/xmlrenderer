@@ -50,7 +50,7 @@ namespace webpp { namespace xml {
 	}
 */
 
-	fragment_output fragment::render(render_context& rnd) {
+	fragment_output fragment::render(render::context& rnd) {
 		STACKED_EXCEPTIONS_ENTER();
 		fragment_output result(name_);
 		xmlpp::Document& output = result.document();
@@ -97,11 +97,6 @@ namespace webpp { namespace xml {
 		STACKED_EXCEPTIONS_LEAVE("fragment name " + name);
 	}
 
-	/// get render context variable
-	const render_context_tree_element& render_context::get(const Glib::ustring& key) {
-		return root_.find(key);
-	}
-
 	const tag* context::find_tag(const Glib::ustring& ns, const Glib::ustring& name) {
 		auto i = tags_.find(std::make_pair(ns, name));
 		if(i == tags_.end())
@@ -119,12 +114,12 @@ namespace webpp { namespace xml {
 	}
 
 	template<>
-	bool render_value<bool>::is_true() const {
+	bool render::value<bool>::is_true() const {
 		return value_;
 	}
 
 
-	void fragment::process_node(const xmlpp::Element* src, xmlpp::Element* dst, render_context& rnd, bool already_processing_outer_repeat) {
+	void fragment::process_node(const xmlpp::Element* src, xmlpp::Element* dst, render::context& rnd, bool already_processing_outer_repeat) {
 		STACKED_EXCEPTIONS_ENTER();
 
 		Glib::ustring repeat_variable, repeat_array;
@@ -155,19 +150,19 @@ namespace webpp { namespace xml {
 					repeat_variable = value;
 				// element visibility
 				} else if(name == "if-exists") {
-					const auto val = rnd.get(value);
+					const auto& val = rnd.get(value);
 					visible &= (!val.empty());
 				} else if(name == "if-not-exists") {
-					const auto val = rnd.get(value);
+					const auto& val = rnd.get(value);
 					visible &= val.empty();
 				} else if(name == "if-true") {
-					const auto val = rnd.get(value);
+					const auto& val = rnd.get(value);
 					ctx_variable_check(src, name, value, val);
-					visible &= val.value().is_true();
+					visible &= val.get_value().is_true();
 				} else if(name == "if-not-true") {
-					const auto val = rnd.get(value);
+					const auto& val = rnd.get(value);
 					ctx_variable_check(src, name, value, val);
-					visible &= !val.value().is_true();
+					visible &= !val.get_value().is_true();
 				} else
 					throw std::runtime_error("webpp://control atribute " + name + " is not implemented");
 			}
@@ -226,9 +221,9 @@ namespace webpp { namespace xml {
 				if(repeat_variable.empty() || repeat_array.empty())
 					throw std::runtime_error("repeat attribute set, but repeat_variable or repeat_array is not set");
 
-				const auto array = rnd.get(repeat_array);
-				for(auto i : array) {
-					rnd.put(repeat_variable, i);
+				auto& array = rnd.get(repeat_array);
+				for(auto& i : array.get_array()) {
+					rnd.import_subtree(repeat_variable, i);
 					process_children(src, dst, rnd);
 				}
 			}
@@ -239,7 +234,7 @@ namespace webpp { namespace xml {
 			if(repeat_variable.empty() || repeat_array.empty())
 				throw std::runtime_error("repeat attribute set, but repeat_variable or repeat_array is not set");
 			// we need to repeat whole xml element
-			const auto array = rnd.get(repeat_array);
+			const auto& array = rnd.get(repeat_array).get_array();
 			if(array.empty())
 				dst->get_parent()->remove_child(dst);
 			else {
@@ -247,7 +242,7 @@ namespace webpp { namespace xml {
 
 				for(auto i = array.begin(); i != array.end();) {
 					// first setup context variable
-					rnd.put(repeat_variable, *i);
+					rnd.import_subtree(repeat_variable, *i);
 					process_node(src, currentdst, rnd, true);
 					// move to next source array element, if it is not end, then add next sibling
 					++i;
@@ -259,7 +254,7 @@ namespace webpp { namespace xml {
 		STACKED_EXCEPTIONS_LEAVE("node " + src->get_namespace_uri() + ":" + src->get_name() + " at line " + boost::lexical_cast<std::string>(src->get_line()));
 	}
 
-	void fragment::process_children(const xmlpp::Element* src, xmlpp::Element* dst, render_context& rnd) {
+	void fragment::process_children(const xmlpp::Element* src, xmlpp::Element* dst, render::context& rnd) {
 		STACKED_EXCEPTIONS_ENTER();
 		for(auto child : src->get_children()) {
 			const xmlpp::Element* childelement = dynamic_cast<xmlpp::Element*>(child);

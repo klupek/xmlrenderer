@@ -13,66 +13,67 @@
 void t1() {
 	tbegin("Test 1: context render value");
 
-	webpp::xml::render_context ctx;
+	webpp::xml::render::context ctx;
 	std::string key = "users.asdf.abuse";
-	ctx.val(key, 42);
+	ctx.create_value(key, 42);
 
 	ttrue(ctx.get("users").empty());
 	ttrue(ctx.get("users.asdf").empty());
 	ttrue(ctx.get("users..asdf.abuse").empty());
 	ttrue(!ctx.get(key).empty());
-	tequal(ctx.get(key).value().output(), "42");
-	texcept(ctx.get(key).value().is_true(), webpp::stacked_exception, "render_value<i>::is_true(): '42' is not a boolean");
+	tequal(ctx.get(key).get_value().output(), "42");
+	texcept(ctx.get(key).get_value().is_true(), webpp::stacked_exception, "render::value<i>::is_true(): '42' is not a boolean");
 	key = "users.nolife.abuse";
 	ttrue(ctx.get(key).empty());
 
 	key = "users.asdf.abuser";
-	ctx.val(key, true);
-	ttrue(ctx.get(key).value().is_true());
+	ctx.create_value(key, true);
+	ttrue(ctx.get(key).get_value().is_true());
 }
 
 // test arrays under keys
 void t2() {
 	tbegin("Test 2: context render array");
 
-	webpp::xml::render_context ctx;
+	webpp::xml::render::context ctx;
 	std::string key = "users.asdf.ofiary";
-	ctx.add_to_array(key).put_value("sot");
-	ctx.add_to_array(key).put_value("drajwer");
+	auto& array = ctx.create_array(key);
+	array.add().create_value("sot");
+	array.add().create_value("drajwer");
 	
 	ttrue(ctx.get("users").empty());
 	ttrue(ctx.get("users.asdf").empty());
 	ttrue(ctx.get("users..asdf.ofiary").empty());
 	ttrue(!ctx.get(key).empty());
 
-	auto i = ctx.get(key).begin();
-	ttrue(i != ctx.get(key).end());
-	tequal(i->value().output(), "sot");
+	auto i = ctx.get(key).get_array().begin();
+	ttrue(i != ctx.get(key).get_array().end());
+	tequal((*i)->get_value().output(), "sot");
 	++i;
-	ttrue(i != ctx.get(key).end());
-	tequal(i->value().output(), "drajwer");
+	ttrue(i != ctx.get(key).get_array().end());
+	tequal((*i)->get_value().output(), "drajwer");
 	++i;
-	ttrue(i == ctx.get(key).end());
+	ttrue(i == ctx.get(key).get_array().end());
 }
 
 // test lambdas returning bools or integers
 void t3() {
 	tbegin("Test 3: lazy evaluated callback");
 
-	webpp::xml::render_context ctx;
+	webpp::xml::render::context ctx;
 	std::string key = "users.asdf.abuse";
 
-	ctx.lambda(key, []() {
+	ctx.create_lambda(key, []() {
 		return 42;
 	});
 
-	tequal(ctx.get(key).value().output(), "42");
-	texcept(ctx.get(key).value().is_true(), webpp::stacked_exception, "render_value<i>::is_true(): '42' is not a boolean");
+	tequal(ctx.get(key).get_value().output(), "42");
+	texcept(ctx.get(key).get_value().is_true(), webpp::stacked_exception, "render::value<i>::is_true(): '42' is not a boolean");
 
 	key = "users.asdf.abuser";
-	ctx.lambda(key, []() { return true; });
-	ttrue(ctx.get(key).value().is_true());
-	tequal(ctx.get(key).value().format("%d"), "1");
+	ctx.create_lambda(key, []() { return true; });
+	ttrue(ctx.get(key).get_value().is_true());
+	tequal(ctx.get(key).get_value().format("%d"), "1");
 }
 
 // test XML fragment rendering without using render context values
@@ -80,7 +81,7 @@ void t4() {
 	tbegin("Test 4: XML fragment");
 
 	webpp::xml::context ctx(".");
-	webpp::xml::render_context rnd;
+	webpp::xml::render::context rnd;
 	webpp::xml::fragment f1("testek", "<rootnode xmlns=\"webpp://xml\"></rootnode>", ctx);
 	tequal(f1.render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode/>\n");
 
@@ -94,7 +95,7 @@ void t4() {
 void t5() {
 	tbegin("Test 5: context basics");
 	webpp::xml::context ctx(".");
-	webpp::xml::render_context rnd;
+	webpp::xml::render::context rnd;
 	ctx.put("testek", "<rootnode xmlns=\"webpp://xml\"></rootnode>");
 	ctx.put("testek2", "<rootnode2 xmlns=\"webpp://xml\"><asdf/><foobar/></rootnode2>");
 
@@ -115,7 +116,7 @@ void t6() {
 	tbegin("Test 6: context with taglib - render tag");
 
 	webpp::xml::context ctx(".");
-	webpp::xml::render_context rnd;
+	webpp::xml::render::context rnd;
 	ctx.load_taglib<webpp::xml::taglib::basic>();
 
 	ctx.put("testek", "<rootnode xmlns=\"webpp://xml\" xmlns:b=\"webpp://basic\"><b><b:render value=\"testval\"/></b></rootnode>");
@@ -128,18 +129,18 @@ void t6() {
 	texcept(ctx.get("testek2").render(rnd), webpp::stacked_exception, "<render> requires value attribute");
 
 	// then, with some value
-	rnd.val("testval", "abuser<>");
+	rnd.create_value("testval", "abuser<>");
 	tequal(ctx.get("testek").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode><b>abuser&lt;&gt;</b></rootnode>\n");
 
 	// and some other value
-	rnd.val("testval", 42);
+	rnd.create_value("testval", 42);
 	tequal(ctx.get("testek").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode><b>42</b></rootnode>\n");
 
 
 	// now, lets try formatting
 
 	ctx.put("testek2", "<rootnode xmlns=\"webpp://xml\" xmlns:b=\"webpp://basic\"><b><b:render format=\"%.3f\" value=\"testval\"/></b></rootnode>");
-	rnd.val("testval", 3.1415);
+	rnd.create_value("testval", 3.1415);
 	tequal(ctx.get("testek2").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode><b>3.142</b></rootnode>\n");
 
 	// default value
@@ -147,7 +148,7 @@ void t6() {
 	ctx.put("testek3", "<rootnode xmlns=\"webpp://xml\" xmlns:b=\"webpp://basic\"><b><b:render format=\"%.3f\" value=\"testval2\" default=\"bezcenne\"/></b></rootnode>");
 	tequal(ctx.get("testek3").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode><b>bezcenne</b></rootnode>\n");
 
-	rnd.val("testval2", 12.34567);
+	rnd.create_value("testval2", 12.34567);
 	tequal(ctx.get("testek3").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode><b>12.346</b></rootnode>\n");
 
 	// required attribute
@@ -163,7 +164,7 @@ void t7() {
 	tbegin("Test 7: context with taglib - format attribute namespace");
 
 	webpp::xml::context ctx(".");
-	webpp::xml::render_context rnd;
+	webpp::xml::render::context rnd;
 	ctx.load_taglib<webpp::xml::taglib::basic>();
 
 	// not implemented namespace tag
@@ -183,11 +184,11 @@ void t7() {
 	texcept(ctx.get("testek").render(rnd), webpp::stacked_exception, "output: required variable 'user.name' not found in render context");
 
 	// missing second variable
-	rnd.val("user.name", "asdf");
+	rnd.create_value("user.name", "asdf");
 	texcept(ctx.get("testek").render(rnd), webpp::stacked_exception, "format: required variable 'user.abuse' not found in render context");
 
 	// everything set
-	rnd.val("user.abuse", M_PI);
+	rnd.create_value("user.abuse", M_PI);
 	tequal(ctx.get("testek").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode><a href=\"/users/asdf\" title=\"user asdf - abuse level 3.14, wiec to abuser\"/></rootnode>\n");
 }
 
@@ -197,7 +198,7 @@ void t8() {
 	tbegin("Test 8: render visibility controls");
 
 	webpp::xml::context ctx(".");
-	webpp::xml::render_context rnd;
+	webpp::xml::render::context rnd;
 	ctx.load_taglib<webpp::xml::taglib::basic>();
 
 	// random misspelled word from control namespace
@@ -208,13 +209,13 @@ void t8() {
 	ctx.put("testek", "<rootnode xmlns=\"webpp://xml\" xmlns:c=\"webpp://control\" xmlns:f=\"webpp://format\" xmlns:b=\"webpp://basic\">foobar!<b c:if-exists=\"testval\" f:title=\"#{testval}\">test <!-- test2 --> <i><b:render value=\"testval\"/></i></b>foobaz!</rootnode>");
 	tequal(ctx.get("testek").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode>foobar!foobaz!</rootnode>\n");
 
-	rnd.val("testval", 42);
+	rnd.create_value("testval", 42);
 	tequal(ctx.get("testek").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode>foobar!<b title=\"42\">test <!-- test2 --> <i>42</i></b>foobaz!</rootnode>\n");
 
 	ctx.put("testek", "<rootnode xmlns=\"webpp://xml\" xmlns:c=\"webpp://control\" xmlns:f=\"webpp://format\" xmlns:b=\"webpp://basic\"><b c:if-not-exists=\"testval2\">testval2 is not set</b><b c:if-exists=\"testval2\">testval value is <b:render value=\"testval2\"/></b></rootnode>");
 	tequal(ctx.get("testek").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode><b>testval2 is not set</b></rootnode>\n");
 
-	rnd.val("testval2", "abuse");
+	rnd.create_value("testval2", "abuse");
 	tequal(ctx.get("testek").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode><b>testval value is abuse</b></rootnode>\n");
 
 	// if-true missing variable
@@ -222,28 +223,28 @@ void t8() {
 	texcept(ctx.get("testek").render(rnd), webpp::stacked_exception, "variable 'testval3' required from <b> at line 1, attribute if-true, is missing");
 
 	// if-true on non-boolean value
-	rnd.val("testval3", 42);
-	texcept(ctx.get("testek").render(rnd), webpp::stacked_exception, "render_value<i>::is_true(): '42' is not a boolean");
+	rnd.create_value("testval3", 42);
+	texcept(ctx.get("testek").render(rnd), webpp::stacked_exception, "render::value<i>::is_true(): '42' is not a boolean");
 
 	// if-(not)-true cascade test
 	ctx.put("testek", "<rootnode xmlns=\"webpp://xml\" xmlns:c=\"webpp://control\" xmlns:f=\"webpp://format\" xmlns:b=\"webpp://basic\"><b c:if-true=\"testval3\"><i c:if-not-true=\"testval4\">foo</i>bar</b><b c:if-not-true=\"testval3\"><i c:if-true=\"testval4\">foo</i>baz</b></rootnode>");
-	rnd.val("testval3", true);
-	rnd.val("testval4", false);
+	rnd.create_value("testval3", true);
+	rnd.create_value("testval4", false);
 
 	tequal(ctx.get("testek").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode><b><i>foo</i>bar</b></rootnode>\n");
 
-	rnd.val("testval3", false);
-	rnd.val("testval4", true);
+	rnd.create_value("testval3", false);
+	rnd.create_value("testval4", true);
 	tequal(ctx.get("testek").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode><b><i>foo</i>baz</b></rootnode>\n");
 
-	rnd.val("testval3", true);
-	rnd.val("testval4", true);
+	rnd.create_value("testval3", true);
+	rnd.create_value("testval4", true);
 	tequal(ctx.get("testek").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode><b>bar</b></rootnode>\n");
 
 	ctx.put("testek", "<rootnode xmlns=\"webpp://xml\" xmlns:c=\"webpp://control\" xmlns:f=\"webpp://format\" xmlns:b=\"webpp://basic\"><b:render c:if-true=\"testval3\" value=\"testval3\"/></rootnode>");
 	tequal(ctx.get("testek").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode>1</rootnode>\n");
 
-	rnd.val("testval3", false);
+	rnd.create_value("testval3", false);
 	tequal(ctx.get("testek").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode/>\n");
 }
 
@@ -252,7 +253,7 @@ void t9() {
 	tbegin("Test 9: render inner repeat");
 
 	webpp::xml::context ctx(".");
-	webpp::xml::render_context rnd;
+	webpp::xml::render::context rnd;
 	ctx.load_taglib<webpp::xml::taglib::basic>();
 
 	ctx.put("testek", "<root xmlns=\"webpp://xml\" xmlns:b=\"webpp://basic\" xmlns:c=\"webpp://control\" c:repeat=\"iner\" c:repeat-array=\"abuserzy\" c:repeat-variable=\"abuser\"><p>abuser <b:render value=\"abuser.name\"/>, poziom <b:render value=\"abuser.level\" format=\"%.1f\"/></p></root>");
@@ -260,22 +261,25 @@ void t9() {
 	// misspeled repeat
 	texcept(ctx.get("testek").render(rnd), webpp::stacked_exception, "repeat must be one of (inner,outer), not 'iner' in line '1', tag 'root'");
 
+	// no array
 	ctx.put("testek", "<root xmlns=\"webpp://xml\" xmlns:f=\"webpp://format\" xmlns:b=\"webpp://basic\" xmlns:c=\"webpp://control\" c:repeat=\"inner\" c:repeat-array=\"abuserzy\" c:repeat-variable=\"abuser\"><p f:data-level=\"#{abuser.level}\">abuser <b:render value=\"abuser.name\"/>, poziom <b:render value=\"abuser.level\" format=\"%.1f\"/></p></root>");
-	tequal(ctx.get("testek").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root/>\n");
+	texcept(ctx.get("testek").render(rnd).to_string(), webpp::stacked_exception, "no array in this node");
 
-	auto& a = rnd.add_to_array("abuserzy");
-	a.find("name").put_value("asdf");
+	auto& array = rnd.create_array("abuserzy");
+
+	auto& a = array.add();
+	a.find("name").create_value("asdf");
 
 
-	auto& b = rnd.add_to_array("abuserzy");
-	b.find("name").put_value("abuser");
+	auto& b = array.add();
+	b.find("name").create_value("abuser");
 
 
 	// missing level in inner repeat
 	texcept(ctx.get("testek").render(rnd), webpp::stacked_exception, "output: required variable 'abuser.level' not found in render context");
 
-	a.find("level").put_value(M_PI);
-	b.find("level").put_value(M_PI_4);
+	a.find("level").create_value(M_PI);
+	b.find("level").create_value(M_PI_4);
 	tequal(ctx.get("testek").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root><p data-level=\"3.1415926535897931\">abuser asdf, poziom 3.1</p><p data-level=\"0.78539816339744828\">abuser abuser, poziom 0.8</p></root>\n");
 
 	// same as above, but repeat other then root's children
@@ -288,7 +292,7 @@ void t10() {
 	tbegin("Test 10: render outer repeat");
 
 	webpp::xml::context ctx(".");
-	webpp::xml::render_context rnd;
+	webpp::xml::render::context rnd;
 	ctx.load_taglib<webpp::xml::taglib::basic>();
 
 	// not possible repeat - outer on root element
@@ -297,22 +301,58 @@ void t10() {
 
 	// empty array
 	ctx.put("testek", "<root xmlns=\"webpp://xml\" xmlns:b=\"webpp://basic\" xmlns:c=\"webpp://control\" xmlns:f=\"webpp://format\"><foo/><div c:repeat=\"outer\" c:repeat-array=\"abuserzy\" c:repeat-variable=\"abuser\" f:data-level=\"dec(#{abuser.level|%03.4f})\"><p>abuser <b:render value=\"abuser.name\"/>, poziom <b:render value=\"abuser.level\" format=\"%.1f\"/></p></div><bar/></root>");
-	tequal(ctx.get("testek").render(rnd).to_string(),"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root><foo/><bar/></root>\n");
+	texcept(ctx.get("testek").render(rnd).to_string(),webpp::stacked_exception, "no array in this node");
 
-	auto& a = rnd.add_to_array("abuserzy");
-	a.find("name").put_value("asdf");
+	auto& array = rnd.create_array("abuserzy");
+
+	auto& a = array.add();
+	a.find("name").create_value("asdf");
 
 
-	auto& b = rnd.add_to_array("abuserzy");
-	b.find("name").put_value("abuser");
+	auto& b = array.add();
+	b.find("name").create_value("abuser");
 
 	// missing variable inside repeat
 	texcept(ctx.get("testek").render(rnd).to_string(), webpp::stacked_exception, "format: required variable 'abuser.level' not found in render context");
 
-	a.find("level").put_value(M_PI);
-	b.find("level").put_value(M_PI_4);
+	a.find("level").create_value(M_PI);
+	b.find("level").create_value(M_PI_4);
 	tequal(ctx.get("testek").render(rnd).to_string(),"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root><foo/><div data-level=\"dec(3.1416)\"><p>abuser asdf, poziom 3.1</p></div><div data-level=\"dec(0.7854)\"><p>abuser abuser, poziom 0.8</p></div><bar/></root>\n");
 }
+
+struct abuser {
+	std::string name;
+	double level;
+};
+
+/*
+template<>
+void webpp::xml::make_renderable(webpp::xml::render::context_tree_element& dst, const abuser& a) {
+	dst.find("name").put_value(a.name);
+	dst.find("level").put_value(a.level);
+}
+
+// render context - lazy evaulated tree elements
+void t11() {
+	tbegin("Test 10: render outer repeat");
+
+	webpp::xml::context ctx(".");
+	webpp::xml::render::context rnd;
+	ctx.load_taglib<webpp::xml::taglib::basic>();
+
+
+
+
+	class abuserzy : public webpp::xml::lazy_array<abuser> {
+		std:
+	public:
+		virtual
+	};
+
+	rnd.lazy_tree("users", webpp::xml::lazy_array_of())
+
+}
+*/
 
 int main()
 {

@@ -7,9 +7,11 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/type_traits.hpp>
+#include <boost/ptr_container/ptr_list.hpp>
 
 #include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/noncopyable.hpp>
 #include <type_traits>
 #include <cstdarg>
 #include <iomanip>
@@ -31,221 +33,261 @@ namespace boost {
 }
 
 namespace webpp { namespace xml {
+	namespace render {
+		/// abstract interface for values in render context
+		/// supports output() - lexical cast to string
+		/// and format(fmt), where fmt is argument for boost::format(fmt) % value
+		class value_base : public boost::noncopyable {
+		public:
+			virtual Glib::ustring format(const Glib::ustring& fmt) const = 0;
+			virtual Glib::ustring output() const = 0;
+			virtual bool is_true() const = 0;
+		};
 
-	/// abstract interface for values in render context
-	/// supports output() - lexical cast to string 
-	/// and format(fmt), where fmt is argument for boost::format(fmt) % value
-	class render_value_base : public boost::noncopyable {
-	public:
-		virtual Glib::ustring format(const Glib::ustring& fmt) const = 0;
-		virtual Glib::ustring output() const = 0;
-		virtual bool is_true() const = 0;
-	};
+		/// default implementations of render_value interface
+		template<typename T>
+		class value : public value_base {
+			const T value_;
+		public:
+			value(const T& value)
+				: value_(value) {}
 
-	/// default implementations of render_value interface
-	template<typename T>
-	class render_value : public render_value_base {
-		const T value_;
-	public:
-		render_value(const T& value) 
-			: value_(value) {}
-		render_value(const render_value&) = delete;
-		render_value& operator=(const render_value&) = delete;
-
-		virtual Glib::ustring format(const Glib::ustring& fmt) const {
-			return (boost::format(fmt) % value_).str();
-		}
-
-		virtual Glib::ustring output() const {
-			return boost::lexical_cast<Glib::ustring>(value_);
-		}
-
-		virtual bool is_true() const {
-			STACKED_EXCEPTIONS_ENTER();
-			throw std::runtime_error("render_value<" + Glib::ustring(typeid(T).name()) + ">::is_true(): '" + output() + "' is not a boolean");
-			STACKED_EXCEPTIONS_LEAVE("");
-		}
-	};
-	
-	// char literals are stored as Glib::ustring
-	template< std::size_t N >
-	class render_value<char[N]> : public render_value<Glib::ustring> {
-	public:
-		render_value(const char value[N]) 
-			: render_value<Glib::ustring>(value) {}		
-	};
-
-	//! \brief Lazy evaluated function/lambda/bind/any callable. Will execute once requested from renderer and then value will be cached.
-	template <typename T>
-	class render_function : public render_value_base {
-		T lambda_;
-		typedef decltype(lambda_()) return_type;
-		mutable std::unique_ptr<render_value<return_type>> value_;
-
-		render_value<return_type>& eval() const {
-			if(!value_)
-				value_.reset(new render_value<return_type>(lambda_()));
-			return *value_;
-		}
-
-	public:
-		render_function(T&& value)
-			: lambda_(std::forward<T>(value)) {}
-
-		render_function(const render_function&) = delete;
-		render_function& operator=(const render_function&) = delete;
-
-		virtual Glib::ustring format(const Glib::ustring& fmt) const {
-			return eval().format(fmt);
-		}
-
-		virtual Glib::ustring output() const {
-			return eval().output();
-		}
-
-		virtual bool is_true() const {
-			return eval().is_true();
-		}
-	};
-
-	template<>
-	bool render_value<bool>::is_true() const;
-
-	/// \brief Key-[Array|Value] tree, each node may be one of: empty (transitive node), value (of any type), array of subtrees
-	class render_context_tree_element {
-		typedef boost::unordered_map<Glib::ustring, render_context_tree_element> children_t;
-		mutable children_t children_;
-		typedef std::list<render_context_tree_element> array_t;
-		array_t array_;
-		std::shared_ptr<render_value_base> value_;
-
-	public:
-		//! \brief Find tree element stored under key in this subtree. Every key exists in tree, but only some of them have associated variables or arrays
-		render_context_tree_element& find(const Glib::ustring& key) {
-			if(key.empty()) 
-				return *this;
-			else {
-				const auto position = key.find('.');
-				if(position == Glib::ustring::npos)
-					return children_[key.substr(0, position)];
-				else
-					return children_[key.substr(0, position)].find(key.substr(position+1));
+			virtual Glib::ustring format(const Glib::ustring& fmt) const {
+				return (boost::format(fmt) % value_).str();
 			}
-		}
+
+			virtual Glib::ustring output() const {
+				return boost::lexical_cast<Glib::ustring>(value_);
+			}
+
+			virtual bool is_true() const {
+				STACKED_EXCEPTIONS_ENTER();
+				throw std::runtime_error("render::value<" + Glib::ustring(typeid(T).name()) + ">::is_true(): '" + output() + "' is not a boolean");
+				STACKED_EXCEPTIONS_LEAVE("");
+			}
+		};
 	
-		//! \brief Get value stored under this tree element.
-		const render_value_base& value() const {
-			return *value_.get();
-		}
+		// char literals are stored as Glib::ustring
+		template< std::size_t N >
+		class value<char[N]> : public value<Glib::ustring> {
+		public:
+			value(const char v[N])
+				: value<Glib::ustring>(v) {}
+		};
 
-		//! \brief Start iterating through array stored in this tree element
-		array_t::const_iterator begin() const {
-			return array_.begin();
-		}
-		
-		//! \brief Next-to-last element in array stored in this tree element
-		array_t::const_iterator end() const {
-			return array_.end();
-		}
+		//! \brief Lazy evaluated function/lambda/bind/any callable. Will execute once requested from renderer and then value will be cached.
+		template <typename T>
+		class function : public value_base {
+			T lambda_;
+			typedef decltype(lambda_()) return_type;
+			mutable std::unique_ptr<value<return_type>> value_;
 
-		//! \brief Store value of any type in this tree element.
-		template<typename T>
-		void put_value(const T& v) {
-			value_.reset(new render_value<T>(v));
-		}
+			value<return_type>& eval() const {
+				if(!value_)
+					value_.reset(new value<return_type>(lambda_()));
+				return *value_;
+			}
 
-		//! \brief Store lazy evaluated callable in this tree element.
-		template<typename T>
-		void put_lambda(T&& v) {
-			value_.reset(new render_function<T>(std::forward<T>(v)));
-		}
+		public:
+			function(T&& value)
+				: lambda_(std::forward<T>(value)) {}
 
-		//! \brief Add one element to array and return reference to it.
-		render_context_tree_element& add_to_array() {
-			array_.emplace_back();
-			return array_.back();
-		}
+			virtual Glib::ustring format(const Glib::ustring& fmt) const {
+				return eval().format(fmt);
+			}
 
-		//! \brief Check if there is no value, no lambda and no array elements.
-		bool empty() const { 
-			return !value_ && array_.empty();
-		}
+			virtual Glib::ustring output() const {
+				return eval().output();
+			}
 
-		//! \brief Check if value or lambda is set.
-		bool has_value() const {
-			return !!value_;
-		}
+			virtual bool is_true() const {
+				return eval().is_true();
+			}
+		};
 
-		void debug(int tab = 0) const {
-			if(has_value())
-				std::cout << std::setw(tab*5) << "" <<  ".: " << value_->output() << std::endl;
-			else
-				std::cout << std::setw(tab*5) << "" << ".: (null)" << std::endl;
-			if(begin() != end()) {
-				std::cout << std::setw(tab*5) << "" << "array elements\n";
-				for(auto e : *this) {
-					e.debug(tab+1);
+		template<>
+		bool value<bool>::is_true() const;
+
+		class tree_element;
+
+		//! Store zero or more sub storages (aka subtrees)
+		class array {
+			typedef std::list<std::shared_ptr<tree_element>> elements_t;
+			elements_t elements_;
+		public:
+			template<typename TreeElementT = tree_element, typename... TreeElementParamsT>
+			TreeElementT& add(TreeElementParamsT&&... params) {
+				elements_.emplace_back(new TreeElementT(std::forward<TreeElementParamsT>(params)...));
+				return *dynamic_cast<TreeElementT*>(elements_.back().get());
+			}
+
+			elements_t::const_iterator begin() const { return elements_.begin(); }
+			elements_t::const_iterator end() const { return elements_.end(); }
+			bool empty() const { return elements_.empty(); }
+		};
+
+		//! \brief Storage node for values used for rendering XML fragment(s)
+		class tree_element : public std::enable_shared_from_this<tree_element>, boost::noncopyable {
+			std::unique_ptr<value_base> value_;
+			std::unique_ptr<array> array_;
+			typedef boost::unordered_map<Glib::ustring, std::shared_ptr<tree_element>> children_t;
+			children_t children_;
+			std::shared_ptr<tree_element> link_;
+
+			inline tree_element& self() { return !link_ ? *this : *link_; }
+			inline const tree_element& self() const { return !link_ ? *this : *link_; }
+		public:
+
+			//! \brief Remove link from this node (used with imported and lazy tree nodes)
+			void remove_link() {
+				link_.reset();
+			}
+
+			//! \brief Create link from this node (used with imported and lazy tree nodes)
+			void create_link(std::shared_ptr<tree_element> e) {
+				std::swap(link_,e);
+			}
+
+			//! \brief Find tree element stored under key in this subtree. Every key exists in tree, but only some of them have associated variables or arrays
+			virtual tree_element& find(const Glib::ustring& key) {
+				if(key.empty())
+					return *this;
+				else {
+					const auto position = key.find('.');
+
+					if(position == Glib::ustring::npos) {
+						auto& result = self().children_[key.substr(0, position)];
+						if(!result)
+							result.reset(new tree_element);
+						return *result;
+
+					} else {
+						auto& result = self().children_[key.substr(0, position)];
+						if(!result)
+							result.reset(new tree_element);
+						return result->find(key.substr(position+1));
+					}
 				}
 			}
 
-			if(!children_.empty()) {
-				std::cout << std::setw(tab*5) << "" << "children\n";
-				for(auto child : children_) {
-					std::cout << std::setw((tab+1)*5) << ""<< "child " << child.first << ":\n";
-					child.second.debug(tab+2);
+
+			//! \brief Get value stored under this tree element. Throw exception if there is no value here.
+			virtual const value_base& get_value() const {
+				if(!self().value_)
+					throw std::runtime_error("no value in this node");
+				return *self().value_;
+			}
+
+			//! \brief Get array stored under this tree element. Throw exception if there is no array here.
+			virtual const array& get_array() const {
+				if(!self().array_)
+					throw std::runtime_error("no array in this node");
+				return *self().array_;
+			}
+
+			bool is_value() const {
+				return !!self().value_;
+			}
+
+			bool is_array() const {
+				return !!self().array_;
+			}
+
+			bool empty() const {
+				return !is_value() && !is_array();
+			}
+
+			//! \brief Put value of any type in this tree element. Also, reset previous value or array stored here.
+			template<typename T, typename StorageT = T>
+			void create_value(const T& v) {
+				self().value_.reset(new value<StorageT>(v));
+				self().array_.reset();
+			}
+
+			//! \brief Put lambda returing value in this tree element. Also, reset previous value or array stored here.
+			template<typename F>
+			void create_lambda(F&& f) {
+				self().value_.reset(new function<F>(std::forward<F>(f)));
+				self().array_.reset();
+			}
+
+			//! \brief Put array here. Also, reset previous value or array stored here. Returns array to fill contents.
+			template<typename ArrayT = array, typename... ArrayParams>
+			ArrayT& create_array(ArrayParams&&... ap) {
+				self().value_.reset();
+				self().array_.reset(new ArrayT(std::forward<ArrayParams>(ap)...));
+				return *self().array_;
+			}
+
+			virtual void debug(int tab = 0) const {
+				if(is_value())
+					std::cout << std::setw(tab*5) << "" << "value: " << value_->output() << std::endl;
+				if(is_array()) {
+					std::cout << std::setw(tab*5) << "" << "array elements:\n";
+					for(auto& i : *self().array_ )
+						i->debug(tab+1);
+				}
+				if(!self().children_.empty()) {
+					for(auto& child : self().children_) {
+						std::cout << std::setw((tab+1)*5) << "" << "child " << child.first << std::endl;
+						child.second->debug(tab+2);
+					}
 				}
 			}
-		}
-	};
+		};
 
 
+		//! \brief Frontend for storage tree
+		class context {
+			mutable tree_element root_; // mutable, because 'read only' operations also create paths
+		public:
+			//! \brief Get mutable tree element found under key
+			tree_element& get(const Glib::ustring &name) {
+				return root_.find(name);
+			}
 
-	/// class which stores values for rendering fragment(s)
-	class render_context {
-		render_context_tree_element root_;
-	public:
-		/// store value (copied) under key
-		template<typename T>
-		render_context& val(const Glib::ustring& key, const T& value) {
-			root_.find(key).put_value(value);
-			return *this;
-		}
+			//! \brief Get const tree element found under key
+			const tree_element& get(const Glib::ustring &name) const {
+				return root_.find(name);
+			}
 
-		/// store reference under key, reference must be valid during rendering
-		template<typename T>
-		render_context& ref(const Glib::ustring& key, const T& value) {
-			root_.find(key).put_value(value);
-			return *this;
-		}
+			//! \brief Store value (copied) under key
+			template<typename T>
+			void create_value(const Glib::ustring& key, const T& value) {
+				get(key).create_value(value);
+			}
 
-		/// store lazy evaulated lambda under key, any lambda reference captures must be valid during rendering
-		template<typename T>
-		render_context& lambda(const Glib::ustring& key, T&& value) {
-			root_.find(key).put_lambda(std::forward<T>(value));
-			return *this;
-		}
+			//! \brief Store reference under key. Referenced variable must be valid during rendering.
+			template<typename T>
+			void create_reference(const Glib::ustring& key, const T& value) {
+				get(key).create_value<T,T&>(value);
+			}
 
-		/// copy subtree to new key
-		void put(const Glib::ustring& key, const render_context_tree_element& subtree) {
-		//	std::cout << "subtree = \n";
-			//subtree.debug();
-			//std::cout << "root before = \n";
-			//root_.debug();
-			root_.find(key) = subtree;
-			//std::cout << "root after = \n";
-			//root_.debug();
+			//! \brief Store lazy evaluated value from lambda under key.
+			template<typename F>
+			void create_lambda(const Glib::ustring& key, F&& function) {
+				get(key).create_lambda(std::forward<F>(function));
+			}
 
-		}
-		
-		/// add to array
-		render_context_tree_element& add_to_array(const Glib::ustring& key) {
-			return root_.find(key).add_to_array();
-		}
+			template<typename ArrayT = array, typename... ArgsT>
+			auto create_array(const Glib::ustring& key, ArgsT&&... args) -> decltype(get(key).create_array<ArrayT, ArgsT...>(std::forward<ArgsT>(args)...)) {
+				return get(key).create_array<ArrayT, ArgsT...>(std::forward<ArgsT>(args)...);
+			}
 
-		/// find by name, descend from root_
-		const render_context_tree_element& get(const Glib::ustring& key);
-	};
+			//! \brief Import subtree to key. Subtree ownership remains as before this call.
+			void import_subtree(const Glib::ustring& key, std::shared_ptr<tree_element> orig) {
+				root_.find(key).remove_link();
+				root_.find(key).create_link(orig);
+			}
 
+			//! \brief Link newly allocated dynamic subtree to key
+			template<typename T, typename... Args>
+			void link_dynamic_subtree(const Glib::ustring& key, Args&&... args) {
+				root_.find(key).remove_link();
+				root_.find(key).create_link(std::make_shared<T>(std::forward<Args>(args)...));
+			}
+		};
+	}
 
 
 	class context;
@@ -266,13 +308,14 @@ namespace webpp { namespace xml {
 
 		//! \brief Convert XML tree to string
 		Glib::ustring to_string() const;
+
 	private:
 		inline xmlpp::Document& document() { return *output_; }
 
 		friend class fragment;
 	};
 
-	/// \brief Piece of html5/xml, which is stored and then rendered using render_context and its values
+	/// \brief Piece of html5/xml, which is stored and then rendered using render::context and its values
 	class fragment : public boost::noncopyable {
 		const Glib::ustring name_;
 		context& context_;
@@ -288,7 +331,7 @@ namespace webpp { namespace xml {
 		fragment& operator=(const fragment&) = delete;
 				
 		/// \brief render this fragment, return XML in string
-		fragment_output render(render_context& rnd);
+		fragment_output render(render::context& rnd);
 	private:
 		// list of modifiers for single attribute
 		typedef std::map<Glib::ustring, Glib::ustring> modifier_list_t;
@@ -296,9 +339,9 @@ namespace webpp { namespace xml {
 		typedef std::map<Glib::ustring, modifier_list_t> modifier_map_t;
 
 		/// \brief Process node 'src' and its children, put generated output into 'dst'
-		void process_node(const xmlpp::Element* src, xmlpp::Element* dst, render_context& rnd, bool already_processing_outer_repeat = false);
+		void process_node(const xmlpp::Element* src, xmlpp::Element* dst, render::context& rnd, bool already_processing_outer_repeat = false);
 		/// \brief Process children of 'src' and put generated output as children of 'dst
-		void process_children(const xmlpp::Element* src, xmlpp::Element* dst, render_context& rnd); 
+		void process_children(const xmlpp::Element* src, xmlpp::Element* dst, render::context& rnd);
 	};
 	
 	
@@ -308,7 +351,7 @@ namespace webpp { namespace xml {
 	class tag {
 	public:
 		/// \brief render as TEXT node to 'dst', using 'src' for attribute source and 'ctx' to value source		
-		virtual void render(xmlpp::Element* dst, const xmlpp::Element* src, render_context& ctx) const = 0;
+		virtual void render(xmlpp::Element* dst, const xmlpp::Element* src, render::context& ctx) const = 0;
 	};
 
 	/*! \brief Handle all attributes and tags in namespace
@@ -317,9 +360,9 @@ namespace webpp { namespace xml {
 	class xmlns {
 	public:
 		/// Process tag 'src' and place result as child element in 'dst'
-		virtual void tag(xmlpp::Element* dst, const xmlpp::Element* src, render_context& ctx) const = 0;
+		virtual void tag(xmlpp::Element* dst, const xmlpp::Element* src, render::context& ctx) const = 0;
 		/// Process attribute 'src' and place results (attributes) inside element 'dst'
-		virtual void attribute(xmlpp::Element* dst, const xmlpp::Attribute* src, render_context& ctx) const = 0;
+		virtual void attribute(xmlpp::Element* dst, const xmlpp::Attribute* src, render::context& ctx) const = 0;
 	};
 
 	/*! \class context

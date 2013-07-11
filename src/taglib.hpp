@@ -7,7 +7,7 @@ namespace webpp { namespace xml { namespace taglib {
 	/// <render value="..."(required) [default="text to insert, if value not found in render ctx", optional, defaults to ""] [required="false", if "false" and no value in ctx, use default value, optional, defaults to true] />
 	class tag_render : public tag {
 	public:
-		virtual void render(xmlpp::Element* dst, const xmlpp::Element* src, render_context& ctx) const {
+		virtual void render(xmlpp::Element* dst, const xmlpp::Element* src, render::context& ctx) const {
 			STACKED_EXCEPTIONS_ENTER();
 			auto value = src->get_attribute("value");
 			if(!value)
@@ -29,13 +29,13 @@ namespace webpp { namespace xml { namespace taglib {
 			if(dfl)
 				defval = dfl->get_value();
 
-			auto val = ctx.get(strvalue);
+			auto& val = ctx.get(strvalue);
 
-			if(val.has_value()) {
+			if(val.is_value()) {
 				if(fmt)
-					dst->add_child_text( ctx.get(strvalue).value().format(fmt->get_value()));
+					dst->add_child_text( ctx.get(strvalue).get_value().format(fmt->get_value()));
 				else
-					dst->add_child_text( ctx.get(strvalue).value().output());
+					dst->add_child_text( ctx.get(strvalue).get_value().output());
 			} else if(!defval.empty()) 
 				dst->add_child_text(defval);
 			else if(required)
@@ -49,11 +49,11 @@ namespace webpp { namespace xml { namespace taglib {
 	 */
 	class format_xmlns : public xmlns {
 	public:
-		virtual void tag(xmlpp::Element* /*dst*/, const xmlpp::Element* /* src */, render_context& /* ctx */ ) const {
+		virtual void tag(xmlpp::Element* /*dst*/, const xmlpp::Element* /* src */, render::context& /* ctx */ ) const {
 			throw std::runtime_error("tag() is not implemented in this xmlns");
 		}
 
-		virtual void attribute(xmlpp::Element* dst, const xmlpp::Attribute* src, render_context& ctx) const {
+		virtual void attribute(xmlpp::Element* dst, const xmlpp::Attribute* src, render::context& ctx) const {
 			STACKED_EXCEPTIONS_ENTER();
 			Glib::ustring source = src->get_value();
 			std::size_t last = 0, start;
@@ -72,16 +72,16 @@ namespace webpp { namespace xml { namespace taglib {
 					if(format.empty()) {
 						throw std::runtime_error("empty format string");
 					}
-					auto var = ctx.get(variable);
-					if(!var.has_value())
+					auto& var = ctx.get(variable);
+					if(!var.is_value())
 						throw std::runtime_error("format: required variable '" + variable + "' not found in render context");
-					result << var.value().format(format);
+					result << var.get_value().format(format);
 				} else {
 					auto variable = source.substr(start+2, end-start-2);
-					auto var = ctx.get(variable);
-					if(!var.has_value())
+					auto& var = ctx.get(variable);
+					if(!var.is_value())
 						throw std::runtime_error("output: required variable '" + variable + "' not found in render context");
-					result << var.value().output();
+					result << var.get_value().output();
 				}
 				last = end+1;
 			}
