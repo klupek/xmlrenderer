@@ -110,26 +110,48 @@ namespace webpp { namespace xml {
 
 		class tree_element;
 
-		//! Store zero or more sub storages (aka subtrees)
-		class array {
+		//! \brief Array interface
+		class array_base {
+		public:
+			virtual tree_element& next() = 0;
+			virtual bool has_next() const = 0;
+			virtual bool empty() const = 0;
+			virtual void reset() = 0;
+		};
+
+		//! \brief Store zero or more sub storages (aka subtrees)
+		class array : public array_base {
 			typedef std::list<std::shared_ptr<tree_element>> elements_t;
 			elements_t elements_;
+			elements_t::iterator it_;
 		public:
+			array() : it_(elements_.end()) {}
+
 			template<typename TreeElementT = tree_element, typename... TreeElementParamsT>
 			TreeElementT& add(TreeElementParamsT&&... params) {
 				elements_.emplace_back(new TreeElementT(std::forward<TreeElementParamsT>(params)...));
 				return *dynamic_cast<TreeElementT*>(elements_.back().get());
 			}
 
-			elements_t::const_iterator begin() const { return elements_.begin(); }
-			elements_t::const_iterator end() const { return elements_.end(); }
-			bool empty() const { return elements_.empty(); }
+			virtual tree_element& next() {
+				return **it_++;
+			}
+
+			virtual bool has_next() const {
+				return it_ != elements_.end();
+			}
+			virtual bool empty() const {
+				return elements_.empty();
+			}
+			virtual void reset() {
+				it_ = elements_.begin();
+			}
 		};
 
 		//! \brief Storage node for values used for rendering XML fragment(s)
 		class tree_element : public std::enable_shared_from_this<tree_element>, boost::noncopyable {
 			std::unique_ptr<value_base> value_;
-			std::unique_ptr<array> array_;
+			std::unique_ptr<array_base> array_;
 			typedef boost::unordered_map<Glib::ustring, std::shared_ptr<tree_element>> children_t;
 			children_t children_;
 			std::shared_ptr<tree_element> link_;
@@ -179,7 +201,7 @@ namespace webpp { namespace xml {
 			}
 
 			//! \brief Get array stored under this tree element. Throw exception if there is no array here.
-			virtual const array& get_array() const {
+			virtual array_base& get_array() const {
 				if(!self().array_)
 					throw std::runtime_error("no array in this node");
 				return *self().array_;
@@ -216,7 +238,7 @@ namespace webpp { namespace xml {
 			ArrayT& create_array(ArrayParams&&... ap) {
 				self().value_.reset();
 				self().array_.reset(new ArrayT(std::forward<ArrayParams>(ap)...));
-				return *self().array_;
+				return *dynamic_cast<ArrayT*>(self().array_.get());
 			}
 
 			virtual void debug(int tab = 0) const {
@@ -224,8 +246,10 @@ namespace webpp { namespace xml {
 					std::cout << std::setw(tab*5) << "" << "value: " << value_->output() << std::endl;
 				if(is_array()) {
 					std::cout << std::setw(tab*5) << "" << "array elements:\n";
-					for(auto& i : *self().array_ )
-						i->debug(tab+1);
+					auto& array = *self().array_;
+					array.reset();
+					while(array.has_next())
+						array.next().debug(tab+1);
 				}
 				if(!self().children_.empty()) {
 					for(auto& child : self().children_) {
@@ -239,16 +263,17 @@ namespace webpp { namespace xml {
 
 		//! \brief Frontend for storage tree
 		class context {
-			mutable tree_element root_; // mutable, because 'read only' operations also create paths
+			mutable std::shared_ptr<tree_element> root_; // mutable, because 'read only' operations also create paths
 		public:
+			context() : root_(std::make_shared<tree_element>()) {}
 			//! \brief Get mutable tree element found under key
 			tree_element& get(const Glib::ustring &name) {
-				return root_.find(name);
+				return root_->find(name);
 			}
 
 			//! \brief Get const tree element found under key
 			const tree_element& get(const Glib::ustring &name) const {
-				return root_.find(name);
+				return root_->find(name);
 			}
 
 			//! \brief Store value (copied) under key
@@ -275,16 +300,16 @@ namespace webpp { namespace xml {
 			}
 
 			//! \brief Import subtree to key. Subtree ownership remains as before this call.
-			void import_subtree(const Glib::ustring& key, std::shared_ptr<tree_element> orig) {
-				root_.find(key).remove_link();
-				root_.find(key).create_link(orig);
+			void import_subtree(const Glib::ustring& key, tree_element& orig) {
+				root_->find(key).remove_link();
+				root_->find(key).create_link(orig.shared_from_this());
 			}
 
 			//! \brief Link newly allocated dynamic subtree to key
 			template<typename T, typename... Args>
 			void link_dynamic_subtree(const Glib::ustring& key, Args&&... args) {
-				root_.find(key).remove_link();
-				root_.find(key).create_link(std::make_shared<T>(std::forward<Args>(args)...));
+				root_->find(key).remove_link();
+				root_->find(key).create_link(std::make_shared<T>(std::forward<Args>(args)...));
 			}
 		};
 	}

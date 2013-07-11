@@ -46,14 +46,15 @@ void t2() {
 	ttrue(ctx.get("users..asdf.ofiary").empty());
 	ttrue(!ctx.get(key).empty());
 
-	auto i = ctx.get(key).get_array().begin();
-	ttrue(i != ctx.get(key).get_array().end());
-	tequal((*i)->get_value().output(), "sot");
-	++i;
-	ttrue(i != ctx.get(key).get_array().end());
-	tequal((*i)->get_value().output(), "drajwer");
-	++i;
-	ttrue(i == ctx.get(key).get_array().end());
+	auto& ar2 = ctx.get(key).get_array();
+	ar2.reset();
+
+	ttrue(ar2.has_next());
+	tequal(ar2.next().get_value().output(), "sot");
+
+	ttrue(ar2.has_next());
+	tequal(ar2.next().get_value().output(), "drajwer");
+	ttrue(!ar2.has_next());
 }
 
 // test lambdas returning bools or integers
@@ -320,39 +321,44 @@ void t10() {
 	tequal(ctx.get("testek").render(rnd).to_string(),"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root><foo/><div data-level=\"dec(3.1416)\"><p>abuser asdf, poziom 3.1</p></div><div data-level=\"dec(0.7854)\"><p>abuser abuser, poziom 0.8</p></div><bar/></root>\n");
 }
 
-struct abuser {
-	std::string name;
-	double level;
-};
-
-/*
-template<>
-void webpp::xml::make_renderable(webpp::xml::render::context_tree_element& dst, const abuser& a) {
-	dst.find("name").put_value(a.name);
-	dst.find("level").put_value(a.level);
-}
-
-// render context - lazy evaulated tree elements
+// render context - lazy evaluated array
 void t11() {
-	tbegin("Test 10: render outer repeat");
+	tbegin("Test 10: lazy evaluated array");
 
 	webpp::xml::context ctx(".");
 	webpp::xml::render::context rnd;
 	ctx.load_taglib<webpp::xml::taglib::basic>();
 
-
-
-
-	class abuserzy : public webpp::xml::lazy_array<abuser> {
-		std:
+	class test_dynamic_array : public webpp::xml::render::array_base {
+		int x; double y;
+		std::shared_ptr<webpp::xml::render::tree_element> object_;
 	public:
-		virtual
+		test_dynamic_array() : x(0), y(1), object_(std::make_shared<webpp::xml::render::tree_element>()) {}
+		virtual webpp::xml::render::tree_element& next() {
+			object_->find("x").create_value(x);
+			object_->find("y").create_value(y);
+			x += 1;
+			y *= M_PI;
+			return *object_;
+		}
+
+		virtual bool has_next() const {
+			return x != 3;
+		}
+		virtual bool empty() const {
+			return false;
+		}
+		virtual void reset() {
+			x = 0; y = 1;
+		}
 	};
 
-	rnd.lazy_tree("users", webpp::xml::lazy_array_of())
+	rnd.get("abuserzy").create_array<test_dynamic_array>();
 
+	ctx.put("testek", "<root xmlns=\"webpp://xml\" xmlns:b=\"webpp://basic\" xmlns:c=\"webpp://control\" xmlns:f=\"webpp://format\"><foo/><div c:repeat=\"outer\" c:repeat-array=\"abuserzy\" c:repeat-variable=\"abuser\" f:data-level=\"dec(#{abuser.y|%03.4f})\"><p>x = <b:render value=\"abuser.x\"/>, poziom <b:render value=\"abuser.y\" format=\"%.1f\"/></p></div><bar/></root>");
+	tequal(ctx.get("testek").render(rnd).to_string(),"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root><foo/><div data-level=\"dec(1.0000)\"><p>x = 0, poziom 1.0</p></div><div data-level=\"dec(3.1416)\"><p>x = 1, poziom 3.1</p></div><div data-level=\"dec(9.8696)\"><p>x = 2, poziom 9.9</p></div><bar/></root>\n");
 }
-*/
+
 
 int main()
 {
@@ -366,5 +372,6 @@ int main()
 	t8();
 	t9();
 	t10();
+	t11();
 	return 0;
 }

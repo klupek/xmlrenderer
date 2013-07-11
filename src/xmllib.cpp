@@ -221,9 +221,10 @@ namespace webpp { namespace xml {
 				if(repeat_variable.empty() || repeat_array.empty())
 					throw std::runtime_error("repeat attribute set, but repeat_variable or repeat_array is not set");
 
-				auto& array = rnd.get(repeat_array);
-				for(auto& i : array.get_array()) {
-					rnd.import_subtree(repeat_variable, i);
+				auto& array = rnd.get(repeat_array).get_array();
+				array.reset();
+				while(array.has_next()) {
+					rnd.import_subtree(repeat_variable, array.next());
 					process_children(src, dst, rnd);
 				}
 			}
@@ -234,19 +235,18 @@ namespace webpp { namespace xml {
 			if(repeat_variable.empty() || repeat_array.empty())
 				throw std::runtime_error("repeat attribute set, but repeat_variable or repeat_array is not set");
 			// we need to repeat whole xml element
-			const auto& array = rnd.get(repeat_array).get_array();
+			auto& array = rnd.get(repeat_array).get_array();
 			if(array.empty())
 				dst->get_parent()->remove_child(dst);
 			else {
 				xmlpp::Element* currentdst = dst;
-
-				for(auto i = array.begin(); i != array.end();) {
+				array.reset();
+				while(array.has_next()) {
 					// first setup context variable
-					rnd.import_subtree(repeat_variable, *i);
+					rnd.import_subtree(repeat_variable, array.next());
 					process_node(src, currentdst, rnd, true);
 					// move to next source array element, if it is not end, then add next sibling
-					++i;
-					if(i != array.end())
+					if(array.has_next())
 						currentdst = currentdst->get_parent()->add_child(src->get_name());
 				}
 			}
