@@ -4,58 +4,11 @@
 #include "xmllib.hpp"
 #include "stacked_exception.h"
 namespace webpp { namespace xml { namespace taglib {
-	/// <render value="..."(required) [default="text to insert, if value not found in render ctx", optional, defaults to ""] [required="false", if "false" and no value in ctx, use default value, optional, defaults to true] />
-	class tag_render : public tag {
-	public:
-		virtual void render(xmlpp::Element* dst, const xmlpp::Element* src, render::context& ctx) const {
-			STACKED_EXCEPTIONS_ENTER();
-			auto value = src->get_attribute("value");
-			if(!value)
-				throw std::runtime_error("<render> requires value attribute");
-			auto strvalue = value->get_value();
-			auto fmt = src->get_attribute("format");
-			auto req = src->get_attribute("required");
-			auto dfl = src->get_attribute("default");
-			bool required = true;
-			Glib::ustring defval;
-			
-			if(req) {
-				if(req->get_value() == "false")
-					required = false;
-				else if(req->get_value() != "true")
-					throw std::runtime_error((boost::format("webpp::xml::taglib::tag_render: <render> at line %d: required=\"true|false\", not '%s'") % src->get_line() % req->get_value()).str());
-			}
-
-			if(dfl)
-				defval = dfl->get_value();
-
-			auto& val = ctx.get(strvalue);
-
-			if(val.is_value()) {
-				if(fmt)
-					dst->add_child_text( ctx.get(strvalue).get_value().format(fmt->get_value()));
-				else
-					dst->add_child_text( ctx.get(strvalue).get_value().output());
-			} else if(!defval.empty()) 
-				dst->add_child_text(defval);
-			else if(required)
-				throw std::runtime_error((boost::format("<render> requires value '%s' in render context") % strvalue).str());
-			STACKED_EXCEPTIONS_LEAVE("");
-		}
-	};
-
 	/*! \brief XMLNS handler for formatting attributes
 	 *  \\example <a f:href="/users/#{user.name}" f:title="user #[user.name} - abuse level #{user.abuse|%.2f]">
 	 */
 	class format_xmlns : public xmlns {
-	public:
-		virtual void tag(xmlpp::Element* /*dst*/, const xmlpp::Element* /* src */, render::context& /* ctx */ ) const {
-			throw std::runtime_error("tag() is not implemented in this xmlns");
-		}
-
-		virtual void attribute(xmlpp::Element* dst, const xmlpp::Attribute* src, render::context& ctx) const {
-			STACKED_EXCEPTIONS_ENTER();
-			Glib::ustring source = src->get_value();
+		Glib::ustring format(const Glib::ustring& source, render::context& ctx) const {
 			std::size_t last = 0, start;
 			std::ostringstream result;
 			while(start = source.find("#{", last), start != Glib::ustring::npos) {
@@ -87,15 +40,56 @@ namespace webpp { namespace xml { namespace taglib {
 			}
 			if(last != source.length())
 				result << source.substr(last);
-			dst->set_attribute(src->get_name(), result.str());
-			STACKED_EXCEPTIONS_LEAVE("attribute " + src->get_namespace_uri() + ":" + src->get_name());
+			return result.str();
 		}
+
+	public:
+		virtual void tag(xmlpp::Element* dst, const xmlpp::Element* src , render::context& ctx) const {
+			STACKED_EXCEPTIONS_ENTER();
+			xmlpp::Element *target;
+			if(src->get_name() == "text") {
+				target = dst;
+			} else {
+				target = dst->add_child(src->get_name());
+				for(const xmlpp::Attribute* i : src->get_attributes()) {
+					if(i->get_namespace_uri() == "webpp://xml" || i->get_namespace_uri() == "webpp://html5") {
+						target->set_attribute(i->get_name(), i->get_value());
+					} else if(i->get_namespace_uri() == "webpp://format") {
+						attribute(target, i, ctx);
+					} else if(i->get_namespace_uri() == "webpp://control") {
+						// ignore control attributes, core handles it
+					} else {
+						throw std::runtime_error("webpp://format tags support only XML/HTML5/webpp://format attributes, not " + i->get_namespace_uri());
+					}
+				}
+			}
+			for(xmlpp::Node* i : src->get_children()) {
+				xmlpp::TextNode* ti = dynamic_cast<xmlpp::TextNode*>(i);
+				xmlpp::CommentNode* ci = dynamic_cast<xmlpp::CommentNode*>(i);
+				xmlpp::CdataNode *cdi = dynamic_cast<xmlpp::CdataNode*>(i);
+				if(ti != nullptr)
+					target->add_child_text(format(ti->get_content(), ctx));
+				else if(ci != nullptr)
+					target->add_child_comment(format(ci->get_content(), ctx));
+				else if(cdi != nullptr)
+					target->add_child_cdata(format(cdi->get_content(), ctx));
+				else
+					throw std::runtime_error("webpp://format rendered tag can contain only text, comment or cdata nodes");
+
+			}
+			STACKED_EXCEPTIONS_LEAVE("tag " + src->get_namespace_uri() + ":" + src->get_name());
+		}
+
+		virtual void attribute(xmlpp::Element* dst, const xmlpp::Attribute* src, render::context& ctx) const {
+			STACKED_EXCEPTIONS_ENTER();
+			dst->set_attribute(src->get_name(), format(src->get_value(), ctx));
+			STACKED_EXCEPTIONS_LEAVE("attribute " + src->get_namespace_uri() + ":" + src->get_name());
+		}			
 	};
 
 	struct basic {
 		template<typename TagsT, typename XmlnsesT>
 		static void process(TagsT& tags, XmlnsesT& xmlnses) {
-			tags[std::make_pair(Glib::ustring("webpp://basic"), Glib::ustring("render"))].reset(new tag_render);
 			xmlnses["webpp://format"].reset(new format_xmlns);
 		}
 	};

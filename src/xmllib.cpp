@@ -125,6 +125,7 @@ namespace webpp { namespace xml {
 		Glib::ustring repeat_variable, repeat_array;
 		enum { inner, outer,none } repeat_type = none;
 		bool visible = true;
+		bool nochildren = false;
 
 		// process control attributes first
 		for(auto attribute : src->get_attributes()) {
@@ -198,6 +199,7 @@ namespace webpp { namespace xml {
 					}
 				}
 			} else {
+				nochildren = true; // custom tags handle their children
 				// look for pair(tagns,tagname) handler
 
 				auto parent = dst->get_parent();
@@ -210,12 +212,13 @@ namespace webpp { namespace xml {
 						throw std::runtime_error( (boost::format("required custom tag %s in ns %s (or namespace handler) not found") % src->get_name() % src->get_namespace_uri()).str());
 
 					nshandler->tag(parent, src, rnd);
-				}
-				tag->render(parent, src, rnd);
+				} else
+					tag->render(parent, src, rnd);
 			}
 
 			if(repeat_type == none) {
-				process_children(src, dst, rnd);
+				if(!nochildren)
+					process_children(src, dst, rnd);
 			} else /* if(repeat_type == inner) */ {
 				// repeat_variable, repeat_array;
 				if(repeat_variable.empty() || repeat_array.empty())
