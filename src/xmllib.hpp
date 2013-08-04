@@ -133,19 +133,10 @@ namespace webpp { namespace xml {
 				return *dynamic_cast<TreeElementT*>(elements_.back().get());
 			}
 
-			virtual tree_element& next() {
-				return **it_++;
-			}
-
-			virtual bool has_next() const {
-				return it_ != elements_.end();
-			}
-			virtual bool empty() const {
-				return elements_.empty();
-			}
-			virtual void reset() {
-				it_ = elements_.begin();
-			}
+            virtual tree_element& next();
+            virtual bool has_next() const;
+            virtual bool empty() const;
+            virtual void reset();
 		};
 
 		//! \brief Storage node for values used for rendering XML fragment(s)
@@ -161,61 +152,28 @@ namespace webpp { namespace xml {
 		public:
 
 			//! \brief Remove link from this node (used with imported and lazy tree nodes)
-			void remove_link() {
-				link_.reset();
-			}
+            void remove_link();
 
 			//! \brief Create link from this node (used with imported and lazy tree nodes)
-			void create_link(std::shared_ptr<tree_element> e) {
-				std::swap(link_,e);
-			}
+            void create_link(std::shared_ptr<tree_element> e);
 
 			//! \brief Find tree element stored under key in this subtree. Every key exists in tree, but only some of them have associated variables or arrays
-			virtual tree_element& find(const Glib::ustring& key) {
-				if(key.empty())
-					return *this;
-				else {
-					const auto position = key.find('.');
-
-					if(position == Glib::ustring::npos) {
-						auto& result = self().children_[key.substr(0, position)];
-						if(!result)
-							result.reset(new tree_element);
-						return *result;
-
-					} else {
-						auto& result = self().children_[key.substr(0, position)];
-						if(!result)
-							result.reset(new tree_element);
-						return result->find(key.substr(position+1));
-					}
-				}
-			}
-
+            virtual tree_element& find(const Glib::ustring& key);
 
 			//! \brief Get value stored under this tree element. Throw exception if there is no value here.
-			virtual const value_base& get_value() const {
-				if(!self().value_)
-					throw std::runtime_error("no value in this node");
-				return *self().value_;
-			}
-
+            virtual const value_base& get_value() const;
 			//! \brief Get array stored under this tree element. Throw exception if there is no array here.
-			virtual array_base& get_array() const {
-				if(!self().array_)
-					throw std::runtime_error("no array in this node");
-				return *self().array_;
-			}
+            virtual array_base& get_array() const;
 
-			bool is_value() const {
+            inline bool is_value() const {
 				return !!self().value_;
 			}
 
-			bool is_array() const {
+            inline bool is_array() const {
 				return !!self().array_;
 			}
 
-			bool empty() const {
+            inline bool empty() const {
 				return !is_value() && !is_array();
 			}
 
@@ -241,24 +199,8 @@ namespace webpp { namespace xml {
 				return *dynamic_cast<ArrayT*>(self().array_.get());
 			}
 
-			virtual void debug(int tab = 0) const {
-				if(is_value())
-					std::cout << std::setw(tab*5) << "" << "value: " << value_->output() << std::endl;
-				if(is_array()) {
-					std::cout << std::setw(tab*5) << "" << "array elements:\n";
-					auto& array = *self().array_;
-					array.reset();
-					while(array.has_next())
-						array.next().debug(tab+1);
-				}
-				if(!self().children_.empty()) {
-					for(auto& child : self().children_) {
-						std::cout << std::setw((tab+1)*5) << "" << "child " << child.first << std::endl;
-						child.second->debug(tab+2);
-					}
-				}
-			}
-		};
+            virtual void debug(int tab = 0) const;
+        };
 
 
 		//! \brief Frontend for storage tree
@@ -267,12 +209,12 @@ namespace webpp { namespace xml {
 		public:
 			context() : root_(std::make_shared<tree_element>()) {}
 			//! \brief Get mutable tree element found under key
-			tree_element& get(const Glib::ustring &name) {
+            inline tree_element& get(const Glib::ustring &name) {
 				return root_->find(name);
 			}
 
 			//! \brief Get const tree element found under key
-			const tree_element& get(const Glib::ustring &name) const {
+            inline const tree_element& get(const Glib::ustring &name) const {
 				return root_->find(name);
 			}
 
@@ -300,10 +242,7 @@ namespace webpp { namespace xml {
 			}
 
 			//! \brief Import subtree to key. Subtree ownership remains as before this call.
-			void import_subtree(const Glib::ustring& key, tree_element& orig) {
-				root_->find(key).remove_link();
-				root_->find(key).create_link(orig.shared_from_this());
-			}
+            void import_subtree(const Glib::ustring& key, tree_element& orig);
 
 			//! \brief Link newly allocated dynamic subtree to key
 			template<typename T, typename... Args>

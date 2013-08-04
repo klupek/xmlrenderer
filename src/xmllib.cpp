@@ -272,6 +272,91 @@ namespace webpp { namespace xml {
 	}
 
 
+    render::tree_element& render::array::next() {
+        return **it_++;
+    }
+
+    bool render::array::has_next() const {
+        return it_ != elements_.end();
+    }
+
+    bool render::array::empty() const {
+        return elements_.empty();
+    }
+
+    void render::array::reset() {
+        it_ = elements_.begin();
+    }
+
+    //! \brief Remove link from this node (used with imported and lazy tree nodes)
+    void render::tree_element::remove_link() {
+        link_.reset();
+    }
+
+    //! \brief Create link from this node (used with imported and lazy tree nodes)
+    void render::tree_element::create_link(std::shared_ptr<tree_element> e) {
+        std::swap(link_,e);
+    }
+
+    //! \brief Find tree element stored under key in this subtree. Every key exists in tree, but only some of them have associated variables or arrays
+    render::tree_element& render::tree_element::find(const Glib::ustring& key) {
+        if(key.empty())
+            return *this;
+        else {
+            const auto position = key.find('.');
+
+            if(position == Glib::ustring::npos) {
+                auto& result = self().children_[key.substr(0, position)];
+                if(!result)
+                    result.reset(new tree_element);
+                return *result;
+
+            } else {
+                auto& result = self().children_[key.substr(0, position)];
+                if(!result)
+                    result.reset(new tree_element);
+                return result->find(key.substr(position+1));
+            }
+        }
+    }
+
+
+    const render::value_base& render::tree_element::get_value() const {
+        if(!self().value_)
+            throw std::runtime_error("no value in this node");
+        return *self().value_;
+    }
+
+    render::array_base& render::tree_element::get_array() const {
+        if(!self().array_)
+            throw std::runtime_error("no array in this node");
+        return *self().array_;
+    }
+
+    void render::tree_element::debug(int tab) const {
+        if(is_value())
+            std::cout << std::setw(tab*5) << "" << "value: " << value_->output() << std::endl;
+        if(is_array()) {
+            std::cout << std::setw(tab*5) << "" << "array elements:\n";
+            auto& array = *self().array_;
+            array.reset();
+            while(array.has_next())
+                array.next().debug(tab+1);
+        }
+        if(!self().children_.empty()) {
+            for(auto& child : self().children_) {
+                std::cout << std::setw((tab+1)*5) << "" << "child " << child.first << std::endl;
+                child.second->debug(tab+2);
+            }
+        }
+    }
+
+    void render::context::import_subtree(const Glib::ustring& key, tree_element& orig) {
+        root_->find(key).remove_link();
+        root_->find(key).create_link(orig.shared_from_this());
+    }
+
+
 }}
 
 
