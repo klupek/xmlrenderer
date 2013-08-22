@@ -119,13 +119,13 @@ namespace webpp { namespace xml {
 	}
 
 
-	void fragment::process_node(const xmlpp::Element* src, xmlpp::Element* dst, render::context& rnd, bool already_processing_outer_repeat) {
+    void fragment::process_node(const xmlpp::Element* src, xmlpp::Element* dst, render::context& rnd, bool already_processing_outer_repeat) {
 		STACKED_EXCEPTIONS_ENTER();
 
 		Glib::ustring repeat_variable, repeat_array;
 		enum { inner, outer,none } repeat_type = none;
 		bool visible = true;
-		bool nochildren = false;
+        bool nochildren = false;
 
 		// process control attributes first
 		for(auto attribute : src->get_attributes()) {
@@ -133,7 +133,7 @@ namespace webpp { namespace xml {
 			const auto name = attribute->get_name();
 			const auto value = attribute->get_value();
 
-			if(ns == "webpp://control") {
+            if(ns == "webpp://control") {
 				// control statements, loops and conditions
 				// foreach loops, outer repeats whole tag and children, inner repeats children only
 				if(name == "repeat") {
@@ -199,21 +199,33 @@ namespace webpp { namespace xml {
 					}
 				}
 			} else {
-				nochildren = true; // custom tags handle their children
-				// look for pair(tagns,tagname) handler
+				nochildren = true; // custom tags handle their children				
+                if(src->get_namespace_uri() == "webpp://control") {
+                    // handle all c: internally
+                    if(src->get_name() == "insert") {
+                        if(src->get_attribute("name") == nullptr)
+                            throw std::runtime_error("webpp://control:insert requires attribute name (inserted view name)");
+                        if(src->get_attribute("value-prefix") == nullptr)
+                            throw std::runtime_error("webpp://control:insert requires attribute value-prefix (prefix for render context variables)");
+                        rnd.push_prefix(src->get_attribute("value-prefix")->get_value());
+                        auto &subdoc = context_.get(src->get_attribute("name")->get_value());
+                        subdoc.process_node(subdoc.reader_.get_document()->get_root_node(), dst, rnd);
+                        rnd.pop_prefix();
+                    } else {
+                        throw std::runtime_error("unknown webpp://control tag: " + src->get_name());
+                    }
+                } else {
+                    // look for pair(tagns,tagname) handler
+                    auto tag = context_.find_tag(src->get_namespace_uri(), src->get_name());
+                    if(tag == nullptr) {
+                        const xmlns* nshandler = context_.find_xmlns(src->get_namespace_uri());
+                        if(!nshandler)
+                            throw std::runtime_error( (boost::format("required custom tag %s in ns %s (or namespace handler) not found") % src->get_name() % src->get_namespace_uri()).str());
 
-				auto parent = dst->get_parent();
-				parent->remove_child(dst);
-
-				auto tag = context_.find_tag(src->get_namespace_uri(), src->get_name());
-				if(tag == nullptr) {
-					const xmlns* nshandler = context_.find_xmlns(src->get_namespace_uri());
-					if(!nshandler)
-						throw std::runtime_error( (boost::format("required custom tag %s in ns %s (or namespace handler) not found") % src->get_name() % src->get_namespace_uri()).str());
-
-					nshandler->tag(parent, src, rnd);
-				} else
-					tag->render(parent, src, rnd);
+                        nshandler->tag(dst, src, rnd);
+                    } else
+                        tag->render(dst, src, rnd);
+                }
 			}
 
 			if(repeat_type == none) {
@@ -247,14 +259,14 @@ namespace webpp { namespace xml {
 				while(array.has_next()) {
 					// first setup context variable
 					rnd.import_subtree(repeat_variable, array.next());
-					process_node(src, currentdst, rnd, true);
+                    process_node(src, currentdst, rnd, true);
 					// move to next source array element, if it is not end, then add next sibling
 					if(array.has_next())
 						currentdst = currentdst->get_parent()->add_child(src->get_name());
 				}
 			}
-		} // if repeat_type
-		STACKED_EXCEPTIONS_LEAVE("node " + src->get_namespace_uri() + ":" + src->get_name() + " at line " + boost::lexical_cast<std::string>(src->get_line()));
+        } // if repeat_type
+        STACKED_EXCEPTIONS_LEAVE("node " + src->get_namespace_uri() + ":" + src->get_name() + " at line " + boost::lexical_cast<std::string>(src->get_line()));
 	}
 
 	void fragment::process_children(const xmlpp::Element* src, xmlpp::Element* dst, render::context& rnd) {
@@ -263,7 +275,7 @@ namespace webpp { namespace xml {
 			const xmlpp::Element* childelement = dynamic_cast<xmlpp::Element*>(child);
 			if(childelement != nullptr) {
 				xmlpp::Element* e = dst->add_child(child->get_name());				
-				process_node(childelement, e, rnd);
+                process_node(childelement, e, rnd);
 			} else {
 				dst->import_node(child);
 			} // if childelement != nullptr
@@ -295,8 +307,14 @@ namespace webpp { namespace xml {
 
     //! \brief Create link from this node (used with imported and lazy tree nodes)
     void render::tree_element::create_link(std::shared_ptr<tree_element> e) {
-        std::swap(link_,e);
+        link_ = e;
     }
+
+    void render::tree_element::create_permanent_link(std::shared_ptr<tree_element> e) {
+        std::swap(permalink_,e);
+        link_ = e;
+    }
+
 
     //! \brief Find tree element stored under key in this subtree. Every key exists in tree, but only some of them have associated variables or arrays
     render::tree_element& render::tree_element::find(const Glib::ustring& key) {
@@ -306,13 +324,13 @@ namespace webpp { namespace xml {
             const auto position = key.find('.');
 
             if(position == Glib::ustring::npos) {
-                auto& result = self().children_[key.substr(0, position)];
+                auto& result = self()->children_[key.substr(0, position)];
                 if(!result)
                     result.reset(new tree_element);
                 return *result;
 
             } else {
-                auto& result = self().children_[key.substr(0, position)];
+                auto& result = self()->children_[key.substr(0, position)];
                 if(!result)
                     result.reset(new tree_element);
                 return result->find(key.substr(position+1));
@@ -322,15 +340,15 @@ namespace webpp { namespace xml {
 
 
     const render::value_base& render::tree_element::get_value() const {
-        if(!self().value_)
+        if(!self()->value_)
             throw std::runtime_error("no value in this node");
-        return *self().value_;
+        return *self()->value_;
     }
 
     render::array_base& render::tree_element::get_array() const {
-        if(!self().array_)
+        if(!self()->array_)
             throw std::runtime_error("no array in this node");
-        return *self().array_;
+        return *self()->array_;
     }
 
     void render::tree_element::debug(int tab) const {
@@ -338,13 +356,13 @@ namespace webpp { namespace xml {
             std::cout << std::setw(tab*5) << "" << "value: " << value_->output() << std::endl;
         if(is_array()) {
             std::cout << std::setw(tab*5) << "" << "array elements:\n";
-            auto& array = *self().array_;
+            auto& array = *self()->array_;
             array.reset();
             while(array.has_next())
                 array.next().debug(tab+1);
         }
-        if(!self().children_.empty()) {
-            for(auto& child : self().children_) {
+        if(!self()->children_.empty()) {
+            for(auto& child : self()->children_) {
                 std::cout << std::setw((tab+1)*5) << "" << "child " << child.first << std::endl;
                 child.second->debug(tab+2);
             }
@@ -355,7 +373,6 @@ namespace webpp { namespace xml {
         root_->find(key).remove_link();
         root_->find(key).create_link(orig.shared_from_this());
     }
-
 
 }}
 

@@ -344,6 +344,40 @@ void t11() {
 	tequal(ctx.get("testek").render(rnd).to_string(),"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root><foo/><div data-level=\"dec(1.0000)\"><p>x = 0, poziom 1.0</p></div><div data-level=\"dec(3.1416)\"><p>x = 1, poziom 3.1</p></div><div data-level=\"dec(9.8696)\"><p>x = 2, poziom 9.9</p></div><bar/></root>\n");
 }
 
+// c:insert, insert view into current node
+void t12() {
+    tbegin("Test 12: c:insert");
+
+    webpp::xml::context ctx(".");
+    webpp::xml::render::context rnd;
+
+    ctx.load_taglib<webpp::xml::taglib::basic>();
+    ctx.put("testek1", "<root xmlns=\"webpp://xml\" xmlns:c=\"webpp://control\" xmlns:f=\"webpp://format\"> <foo /><c:insert name=\"innertestek\" value-prefix=\"\" /><bar /></root>");
+    ctx.put("testek2", "<root xmlns=\"webpp://xml\" xmlns:c=\"webpp://control\" xmlns:f=\"webpp://format\"> <foo /><c:insert name=\"innertestek\" value-prefix=\"foo.bar\" /><bar /></root>");
+    ctx.put("innertestek", "<f:b xmlns=\"webpp://xml\" xmlns:f=\"webpp://format\" f:data-notb=\"#{numberofthebeast}\">notb = #{numberofthebeast}</f:b>");
+
+
+    rnd.create_value("numberofthebeast", 667);
+    rnd.create_value("foo.bar.numberofthebeast", 666);
+
+    tequal(ctx.get("testek1").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root> <foo/><b data-notb=\"667\">notb = 667</b><bar/></root>\n");
+    tequal(ctx.get("testek2").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root> <foo/><b data-notb=\"666\">notb = 666</b><bar/></root>\n");
+
+    // and once again
+    tequal(ctx.get("testek1").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root> <foo/><b data-notb=\"667\">notb = 667</b><bar/></root>\n");
+    tequal(ctx.get("testek2").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root> <foo/><b data-notb=\"666\">notb = 666</b><bar/></root>\n");
+    
+    // more complicated 
+
+    auto &array = rnd.create_array("beasts");
+    array.add().find("numberofthebeast").create_value(42);
+    array.add().find("numberofthebeast").create_value(139);
+    
+    ctx.put("testek3", "<root xmlns=\"webpp://xml\" xmlns:c=\"webpp://control\" xmlns:f=\"webpp://format\"> <foo /><c:insert c:repeat=\"outer\" c:repeat-variable=\"notb\" c:repeat-array=\"beasts\" name=\"innertestek\" value-prefix=\"notb\" /><bar /></root>");
+
+    tequal(ctx.get("testek3").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root> <foo/><b data-notb=\"42\">notb = 42</b><b data-notb=\"139\">notb = 139</b><bar/></root>\n");
+}
+
 
 int main()
 {
@@ -358,5 +392,6 @@ int main()
 	t9();
 	t10();
 	t11();
+    t12();
 	return 0;
 }

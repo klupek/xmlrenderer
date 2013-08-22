@@ -9,7 +9,12 @@ SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ${CXX_FLAGS_BASE} -Wall -Wex
 SET(CMAKE_C_COMPILER "clang")
 SET(CMAKE_CXX_COMPILER "clang++")
 
-INCLUDE_DIRECTORIES(/usr/include/libxml++-2.6 /usr/include/libxml2 /usr/lib64/libxml++-2.6/include /usr/lib64/glibmm-2.4/include /usr/include/sigc++-2.0 /usr/lib64/sigc++-2.0/include /usr/include/glib-2.0 /usr/lib64/glib-2.0/include /usr/include/glibmm-2.4)
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
+
+FIND_PACKAGE(libxml++ REQUIRED)
+
+INCLUDE_DIRECTORIES(${LibXML++_INCLUDE_DIRS})
+ 
 
 add_executable(test1 tests/test.cpp src/xmllib.cpp src/taglib.hpp src/stacked_exception.cpp)
-target_link_libraries(test1 xml++-2.6 glibmm-2.4 boost_filesystem boost_system)
+target_link_libraries(test1 ${LibXML++_LIBRARIES} boost_filesystem boost_system)

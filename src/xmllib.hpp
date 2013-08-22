@@ -42,6 +42,7 @@ namespace webpp { namespace xml {
 			virtual Glib::ustring format(const Glib::ustring& fmt) const = 0;
 			virtual Glib::ustring output() const = 0;
 			virtual bool is_true() const = 0;
+            virtual ~value_base() {}
 		};
 
 		/// default implementations of render_value interface
@@ -117,6 +118,7 @@ namespace webpp { namespace xml {
 			virtual bool has_next() const = 0;
 			virtual bool empty() const = 0;
 			virtual void reset() = 0;
+            virtual ~array_base() {}
 		};
 
 		//! \brief Store zero or more sub storages (aka subtrees)
@@ -145,17 +147,21 @@ namespace webpp { namespace xml {
 			std::unique_ptr<array_base> array_;
 			typedef boost::unordered_map<Glib::ustring, std::shared_ptr<tree_element>> children_t;
 			children_t children_;
-			std::shared_ptr<tree_element> link_;
+            std::weak_ptr<tree_element> link_;
+            std::shared_ptr<tree_element> permalink_;
 
-			inline tree_element& self() { return !link_ ? *this : *link_; }
-			inline const tree_element& self() const { return !link_ ? *this : *link_; }
+            inline std::shared_ptr<tree_element> self() { return link_.expired() ? shared_from_this() : link_.lock(); }
+            inline std::shared_ptr<const tree_element> self() const { return link_.expired() ? shared_from_this() : link_.lock(); }
 		public:
 
 			//! \brief Remove link from this node (used with imported and lazy tree nodes)
             void remove_link();
 
-			//! \brief Create link from this node (used with imported and lazy tree nodes)
+            //! \brief Create link from this node (used with imported tree nodes)
             void create_link(std::shared_ptr<tree_element> e);
+
+            //! \brief Create permanent link (used with lazy tree nodes)
+            void create_permanent_link(std::shared_ptr<tree_element> e);
 
 			//! \brief Find tree element stored under key in this subtree. Every key exists in tree, but only some of them have associated variables or arrays
             virtual tree_element& find(const Glib::ustring& key);
@@ -166,11 +172,11 @@ namespace webpp { namespace xml {
             virtual array_base& get_array() const;
 
             inline bool is_value() const {
-				return !!self().value_;
+                return !!self()->value_;
 			}
 
             inline bool is_array() const {
-				return !!self().array_;
+                return !!self()->array_;
 			}
 
             inline bool empty() const {
@@ -180,23 +186,23 @@ namespace webpp { namespace xml {
 			//! \brief Put value of any type in this tree element. Also, reset previous value or array stored here.
 			template<typename T, typename StorageT = T>
 			void create_value(const T& v) {
-				self().value_.reset(new value<StorageT>(v));
-				self().array_.reset();
+                self()->value_.reset(new value<StorageT>(v));
+                self()->array_.reset();
 			}
 
 			//! \brief Put lambda returing value in this tree element. Also, reset previous value or array stored here.
 			template<typename F>
 			void create_lambda(F&& f) {
-				self().value_.reset(new function<F>(std::forward<F>(f)));
-				self().array_.reset();
+                self()->value_.reset(new function<F>(std::forward<F>(f)));
+                self()->array_.reset();
 			}
 
 			//! \brief Put array here. Also, reset previous value or array stored here. Returns array to fill contents.
 			template<typename ArrayT = array, typename... ArrayParams>
 			ArrayT& create_array(ArrayParams&&... ap) {
-				self().value_.reset();
-				self().array_.reset(new ArrayT(std::forward<ArrayParams>(ap)...));
-				return *dynamic_cast<ArrayT*>(self().array_.get());
+                self()->value_.reset();
+                self()->array_.reset(new ArrayT(std::forward<ArrayParams>(ap)...));
+                return *dynamic_cast<ArrayT*>(self()->array_.get());
 			}
 
             virtual void debug(int tab = 0) const;
@@ -206,11 +212,13 @@ namespace webpp { namespace xml {
 		//! \brief Frontend for storage tree
 		class context {
 			mutable std::shared_ptr<tree_element> root_; // mutable, because 'read only' operations also create paths
+            std::deque<Glib::ustring> prefixes_;
+            Glib::ustring current_prefix_;
 		public:
 			context() : root_(std::make_shared<tree_element>()) {}
 			//! \brief Get mutable tree element found under key
             inline tree_element& get(const Glib::ustring &name) {
-				return root_->find(name);
+                return root_->find(current_prefix_ + name);
 			}
 
 			//! \brief Get const tree element found under key
@@ -250,6 +258,24 @@ namespace webpp { namespace xml {
 				root_->find(key).remove_link();
 				root_->find(key).create_link(std::make_shared<T>(std::forward<Args>(args)...));
 			}
+
+            //! \brief All searches after this call will add this (and previous) prefixes joined by "."
+            inline void push_prefix(const Glib::ustring& prefix) {
+                prefixes_.push_back(prefix);
+                if(!prefix.empty()) {
+                    current_prefix_ += prefix + ".";
+                }
+            }
+
+            //! \brief Pop last added prefix
+            inline void pop_prefix() {
+                prefixes_.pop_back();
+                current_prefix_ = "";
+                for(const auto &i : prefixes_)
+                    if(!i.empty())
+                        current_prefix_ += i + ".";
+
+            }
 		};
 	}
 
@@ -303,7 +329,7 @@ namespace webpp { namespace xml {
 		typedef std::map<Glib::ustring, modifier_list_t> modifier_map_t;
 
 		/// \brief Process node 'src' and its children, put generated output into 'dst'
-		void process_node(const xmlpp::Element* src, xmlpp::Element* dst, render::context& rnd, bool already_processing_outer_repeat = false);
+        void process_node(const xmlpp::Element* src, xmlpp::Element* dst, render::context& rnd, bool already_processing_outer_repeat = false);
 		/// \brief Process children of 'src' and put generated output as children of 'dst
 		void process_children(const xmlpp::Element* src, xmlpp::Element* dst, render::context& rnd);
 	};
@@ -323,7 +349,7 @@ namespace webpp { namespace xml {
 	 */
 	class xmlns {
 	public:
-		/// Process tag 'src' and place result as child element in 'dst'
+        /// Process tag 'src' and place result as element 'dst'
 		virtual void tag(xmlpp::Element* dst, const xmlpp::Element* src, render::context& ctx) const = 0;
 		/// Process attribute 'src' and place results (attributes) inside element 'dst'
 		virtual void attribute(xmlpp::Element* dst, const xmlpp::Attribute* src, render::context& ctx) const = 0;

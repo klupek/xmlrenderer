@@ -48,9 +48,13 @@ namespace webpp { namespace xml { namespace taglib {
 			STACKED_EXCEPTIONS_ENTER();
 			xmlpp::Element *target;
 			if(src->get_name() == "text") {
-				target = dst;
+                target = dst->get_parent();
+                if(target == nullptr)
+                    throw std::runtime_error("format: text node cannot be root node");
+                target->remove_child(dst);
 			} else {
-				target = dst->add_child(src->get_name());
+                target = dst;
+                target->set_name(src->get_name());
 				for(const xmlpp::Attribute* i : src->get_attributes()) {
 					if(i->get_namespace_uri() == "webpp://xml" || i->get_namespace_uri() == "webpp://html5") {
 						target->set_attribute(i->get_name(), i->get_value());
