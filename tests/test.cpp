@@ -379,7 +379,20 @@ void t12() {
 }
 
 void t13() {
-    tbegin("Test 13: html5 bolilerplate loading, parsing and writing");
+    tbegin("Test 13: test custom namespace");
+
+    webpp::xml::context ctx("../tests");
+    webpp::xml::render::context rnd;
+
+    ctx.load_taglib<webpp::xml::taglib::basic>();
+
+    ctx.put("testek", "<root xmlns=\"http://example.org/example\" xmlns:f=\"webpp://format\" xmlns:c=\"http://example.org/example2\"><f:p>#{value}</f:p><c:example><f:text>#{value} - </f:text>blah</c:example></root>");
+    rnd.create_value("value", 42);
+    tequal(ctx.get("testek").render(rnd).xml().to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root xmlns=\"http://example.org/example\" xmlns:c=\"http://example.org/example2\"><p>42</p><c:example>42 - blah</c:example></root>\n");
+}
+
+void t14() {
+    tbegin("Test 14: html5 bolilerplate loading, parsing and writing");
 
     webpp::xml::context ctx("../tests");
     webpp::xml::render::context rnd;

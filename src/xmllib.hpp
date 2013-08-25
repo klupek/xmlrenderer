@@ -339,9 +339,9 @@ namespace webpp { namespace xml {
 		typedef std::map<Glib::ustring, modifier_list_t> modifier_map_t;
 
 		/// \brief Process node 'src' and its children, put generated output into 'dst'
-        void process_node(const xmlpp::Element* src, xmlpp::Element* dst, render::context& rnd, bool already_processing_outer_repeat = false);
+        void process_node(const xmlpp::Element* src, xmlpp::Document& output, xmlpp::Element* dst, render::context& rnd, bool already_processing_outer_repeat = false);
 		/// \brief Process children of 'src' and put generated output as children of 'dst
-		void process_children(const xmlpp::Element* src, xmlpp::Element* dst, render::context& rnd);
+        void process_children(const xmlpp::Element* src, xmlpp::Document& output, xmlpp::Element* dst, render::context& rnd);
 	};
 	
 	

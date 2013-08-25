@@ -82,7 +82,7 @@ namespace webpp { namespace xml {
             }
         }
 
-		process_node(src, dst, rnd);
+        process_node(src, output, dst, rnd);
 		return result;
 		STACKED_EXCEPTIONS_LEAVE("fragment '" + name_ + "'");
 	}		
@@ -144,7 +144,7 @@ namespace webpp { namespace xml {
 	}
 
 
-    void fragment::process_node(const xmlpp::Element* src, xmlpp::Element* dst, render::context& rnd, bool already_processing_outer_repeat) {
+    void fragment::process_node(const xmlpp::Element* src, xmlpp::Document& output, xmlpp::Element* dst, render::context& rnd, bool already_processing_outer_repeat) {
 		STACKED_EXCEPTIONS_ENTER();
 
 		Glib::ustring repeat_variable, repeat_array;
@@ -205,8 +205,14 @@ namespace webpp { namespace xml {
 				parent->remove_child(dst);
 		} else if(repeat_type != outer) {
 			// element is visible AND it is not outer repeat
-			if(src->get_namespace_uri() == "webpp://html5" || src->get_namespace_uri() == "webpp://xml") {
-				// normal tag, process attributes
+            if(src->get_namespace_uri() == "webpp://html5" || src->get_namespace_uri() == "webpp://xml" || src->get_namespace_uri().find("webpp://") == Glib::ustring::npos) {
+                if(src->get_namespace_uri() == "webpp://html5")
+                    output.get_root_node()->set_namespace_declaration("http://www.w3.org/1999/xhtml");
+                else if(src->get_namespace_uri() != "webpp://xml") {
+                    output.get_root_node()->set_namespace_declaration(src->get_namespace_uri(), src->get_namespace_prefix());
+                    dst->set_namespace(src->get_namespace_prefix());
+                }
+				// normal tag, process attributes                
 				// and every other attribute then
 				for(auto attribute : src->get_attributes()) {
 					const auto ns = attribute->get_namespace_uri();
@@ -234,7 +240,7 @@ namespace webpp { namespace xml {
                             throw std::runtime_error("webpp://control:insert requires attribute value-prefix (prefix for render context variables)");
                         rnd.push_prefix(src->get_attribute("value-prefix")->get_value());
                         auto &subdoc = context_.get(src->get_attribute("name")->get_value());
-                        subdoc.process_node(subdoc.reader_.get_document()->get_root_node(), dst, rnd);
+                        subdoc.process_node(subdoc.reader_.get_document()->get_root_node(), output, dst, rnd);
                         rnd.pop_prefix();
                     } else {
                         throw std::runtime_error("unknown webpp://control tag: " + src->get_name());
@@ -255,7 +261,7 @@ namespace webpp { namespace xml {
 
 			if(repeat_type == none) {
 				if(!nochildren)
-					process_children(src, dst, rnd);
+                    process_children(src, output, dst, rnd);
 			} else /* if(repeat_type == inner) */ {
 				// repeat_variable, repeat_array;
 				if(repeat_variable.empty() || repeat_array.empty())
@@ -265,7 +271,7 @@ namespace webpp { namespace xml {
 				array.reset();
 				while(array.has_next()) {
 					rnd.import_subtree(repeat_variable, array.next());
-					process_children(src, dst, rnd);
+                    process_children(src, output, dst, rnd);
 				}
 			}
 		} else { // repeat_type == outer
@@ -284,7 +290,7 @@ namespace webpp { namespace xml {
 				while(array.has_next()) {
 					// first setup context variable
 					rnd.import_subtree(repeat_variable, array.next());
-                    process_node(src, currentdst, rnd, true);
+                    process_node(src, output, currentdst, rnd, true);
 					// move to next source array element, if it is not end, then add next sibling
 					if(array.has_next())
 						currentdst = currentdst->get_parent()->add_child(src->get_name());
@@ -294,13 +300,13 @@ namespace webpp { namespace xml {
         STACKED_EXCEPTIONS_LEAVE("node " + src->get_namespace_uri() + ":" + src->get_name() + " at line " + boost::lexical_cast<std::string>(src->get_line()));
 	}
 
-	void fragment::process_children(const xmlpp::Element* src, xmlpp::Element* dst, render::context& rnd) {
+    void fragment::process_children(const xmlpp::Element* src, xmlpp::Document& output, xmlpp::Element* dst, render::context& rnd) {
 		STACKED_EXCEPTIONS_ENTER();
 		for(auto child : src->get_children()) {
 			const xmlpp::Element* childelement = dynamic_cast<xmlpp::Element*>(child);
 			if(childelement != nullptr) {
 				xmlpp::Element* e = dst->add_child(child->get_name());				
-                process_node(childelement, e, rnd);
+                process_node(childelement, output, e, rnd);
 			} else {
 				dst->import_node(child);
 			} // if childelement != nullptr
