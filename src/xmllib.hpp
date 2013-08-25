@@ -296,8 +296,18 @@ namespace webpp { namespace xml {
 		/// \brief Find all nodes matching to XPath expression
 		//xmlpp::NodeSet find_by_xpath(const Glib::ustring& query) const;
 
-		//! \brief Convert XML tree to string
-		Glib::ustring to_string() const;
+        //! \brief Convert output to valid XML (currently: nothing to do)
+        fragment_output& xml();
+
+        enum class html5_encoding {
+            BASIC, // add DOCTYPE, add xmlns to <html>
+            EXTENDED // BASIC + add conditional <html> ( generates <html> classes ie-lt9, ie-lt8, ie-lt7 )
+        };
+
+        //! \brief Convert XML tree to valid HTML5 and add fixes (conditional <html> etc.)
+        fragment_output& xhtml5(html5_encoding encoding);
+
+        Glib::ustring to_string() const;
 
 	private:
 		inline xmlpp::Document& document() { return *output_; }

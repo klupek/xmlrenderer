@@ -84,12 +84,12 @@ void t4() {
 	webpp::xml::context ctx(".");
 	webpp::xml::render::context rnd;
 	webpp::xml::fragment f1("testek", "<rootnode xmlns=\"webpp://xml\"></rootnode>", ctx);
-	tequal(f1.render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode/>\n");
+    tequal(f1.render(rnd).xml().to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode/>\n");
 
 
 	webpp::xml::fragment f2("testek2", "<rootnode2 xmlns=\"webpp://xml\"><asdf foo=\"bar\"/><foobar/><!-- test --></rootnode2>", ctx);
 
-	tequal(f2.render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode2><asdf foo=\"bar\"/><foobar/><!-- test --></rootnode2>\n");
+    tequal(f2.render(rnd).xml().to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode2><asdf foo=\"bar\"/><foobar/><!-- test --></rootnode2>\n");
 }
 
 // same as above, but use proper context loading
@@ -100,8 +100,8 @@ void t5() {
 	ctx.put("testek", "<rootnode xmlns=\"webpp://xml\"></rootnode>");
 	ctx.put("testek2", "<rootnode2 xmlns=\"webpp://xml\"><asdf/><foobar/></rootnode2>");
 
-	tequal(ctx.get("testek").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode/>\n");
-	tequal(ctx.get("testek2").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode2><asdf/><foobar/></rootnode2>\n");
+    tequal(ctx.get("testek").render(rnd).xml().to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode/>\n");
+    tequal(ctx.get("testek2").render(rnd).xml().to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode2><asdf/><foobar/></rootnode2>\n");
 
 	ctx.put("testek3", "<rootnode2 xmlns=\"webpp://xml\" xmlns:t=\"webpp://test\"><t:foo/><asdf/><foobar/></rootnode2>");
 	texcept(ctx.get("testek3").render(rnd), webpp::stacked_exception, "required custom tag foo in ns webpp://test (or namespace handler) not found");
@@ -127,26 +127,26 @@ void t6() {
 
 	// then, with some value
 	rnd.create_value("testval", "abuser<>");
-	tequal(ctx.get("testek").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode><b>abuser&lt;&gt;</b></rootnode>\n");
+    tequal(ctx.get("testek").render(rnd).xml().to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode><b>abuser&lt;&gt;</b></rootnode>\n");
 
 	// and some other value
 	rnd.create_value("testval", 42);
-	tequal(ctx.get("testek").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode><b>42</b></rootnode>\n");
+    tequal(ctx.get("testek").render(rnd).xml().to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode><b>42</b></rootnode>\n");
 
 
 	// now, lets try formatting
 
 	ctx.put("testek2", "<rootnode xmlns=\"webpp://xml\" xmlns:f=\"webpp://format\"><f:b>#{testval|%.3f}</f:b></rootnode>");
 	rnd.create_value("testval", 3.1415);
-	tequal(ctx.get("testek2").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode><b>3.142</b></rootnode>\n");
+    tequal(ctx.get("testek2").render(rnd).xml().to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode><b>3.142</b></rootnode>\n");
 
 	// if-(not)-exists combination
 
 	ctx.put("testek3", "<rootnode xmlns=\"webpp://xml\" xmlns:f=\"webpp://format\" xmlns:c=\"webpp://control\"><f:b c:if-exists=\"testval2\">#{testval2|%.3f}</f:b><b c:if-not-exists=\"testval2\">bezcenne</b></rootnode>");
-	tequal(ctx.get("testek3").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode><b>bezcenne</b></rootnode>\n");
+    tequal(ctx.get("testek3").render(rnd).xml().to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode><b>bezcenne</b></rootnode>\n");
 
 	rnd.create_value("testval2", 12.34567);
-	tequal(ctx.get("testek3").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode><b>12.346</b></rootnode>\n");
+    tequal(ctx.get("testek3").render(rnd).xml().to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode><b>12.346</b></rootnode>\n");
 }
 
 // context with taglib - format attribute namespace
@@ -175,7 +175,7 @@ void t7() {
 
 	// everything set
 	rnd.create_value("user.abuse", M_PI);
-	tequal(ctx.get("testek").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode><a href=\"/users/asdf\" title=\"user asdf - abuse level 3.14, wiec to abuser\"/></rootnode>\n");
+    tequal(ctx.get("testek").render(rnd).xml().to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode><a href=\"/users/asdf\" title=\"user asdf - abuse level 3.14, wiec to abuser\"/></rootnode>\n");
 }
 
 
@@ -193,16 +193,16 @@ void t8() {
 
 	// testval is not set, but won't be evaulated - element is not visible
 	ctx.put("testek", "<rootnode xmlns=\"webpp://xml\" xmlns:c=\"webpp://control\" xmlns:f=\"webpp://format\">foobar!<b c:if-exists=\"testval\" f:title=\"#{testval}\">test <!-- test2 --> <i><f:text>#{testval}</f:text></i></b>foobaz!</rootnode>");
-	tequal(ctx.get("testek").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode>foobar!foobaz!</rootnode>\n");
+    tequal(ctx.get("testek").render(rnd).xml().to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode>foobar!foobaz!</rootnode>\n");
 
 	rnd.create_value("testval", 42);
-	tequal(ctx.get("testek").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode>foobar!<b title=\"42\">test <!-- test2 --> <i>42</i></b>foobaz!</rootnode>\n");
+    tequal(ctx.get("testek").render(rnd).xml().to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode>foobar!<b title=\"42\">test <!-- test2 --> <i>42</i></b>foobaz!</rootnode>\n");
 
 	ctx.put("testek", "<rootnode xmlns=\"webpp://xml\" xmlns:c=\"webpp://control\" xmlns:f=\"webpp://format\"><b c:if-not-exists=\"testval2\">testval2 is not set</b><f:b c:if-exists=\"testval2\">testval value is #{testval2}</f:b></rootnode>");
-	tequal(ctx.get("testek").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode><b>testval2 is not set</b></rootnode>\n");
+    tequal(ctx.get("testek").render(rnd).xml().to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode><b>testval2 is not set</b></rootnode>\n");
 
 	rnd.create_value("testval2", "abuse");
-	tequal(ctx.get("testek").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode><b>testval value is abuse</b></rootnode>\n");
+    tequal(ctx.get("testek").render(rnd).xml().to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode><b>testval value is abuse</b></rootnode>\n");
 
 	// if-true missing variable
 	ctx.put("testek", "<rootnode xmlns=\"webpp://xml\" xmlns:c=\"webpp://control\" xmlns:f=\"webpp://format\"><b c:if-true=\"testval3\">foo</b></rootnode>");
@@ -217,21 +217,21 @@ void t8() {
 	rnd.create_value("testval3", true);
 	rnd.create_value("testval4", false);
 
-	tequal(ctx.get("testek").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode><b><i>foo</i>bar</b></rootnode>\n");
+    tequal(ctx.get("testek").render(rnd).xml().to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode><b><i>foo</i>bar</b></rootnode>\n");
 
 	rnd.create_value("testval3", false);
 	rnd.create_value("testval4", true);
-	tequal(ctx.get("testek").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode><b><i>foo</i>baz</b></rootnode>\n");
+    tequal(ctx.get("testek").render(rnd).xml().to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode><b><i>foo</i>baz</b></rootnode>\n");
 
 	rnd.create_value("testval3", true);
 	rnd.create_value("testval4", true);
-	tequal(ctx.get("testek").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode><b>bar</b></rootnode>\n");
+    tequal(ctx.get("testek").render(rnd).xml().to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode><b>bar</b></rootnode>\n");
 
 	ctx.put("testek", "<rootnode xmlns=\"webpp://xml\" xmlns:c=\"webpp://control\" xmlns:f=\"webpp://format\"><f:text c:if-true=\"testval3\">#{testval3}</f:text></rootnode>");
-	tequal(ctx.get("testek").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode>1</rootnode>\n");
+    tequal(ctx.get("testek").render(rnd).xml().to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode>1</rootnode>\n");
 
 	rnd.create_value("testval3", false);
-	tequal(ctx.get("testek").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode/>\n");
+    tequal(ctx.get("testek").render(rnd).xml().to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode/>\n");
 }
 
 // control - inner repeat
@@ -249,7 +249,7 @@ void t9() {
 
 	// no array
 	ctx.put("testek", "<root xmlns=\"webpp://xml\" xmlns:f=\"webpp://format\" xmlns:c=\"webpp://control\" c:repeat=\"inner\" c:repeat-array=\"abuserzy\" c:repeat-variable=\"abuser\"><f:p f:data-level=\"#{abuser.level}\">abuser #{abuser.name}, poziom #{abuser.level|%.1f}</f:p></root>");
-	texcept(ctx.get("testek").render(rnd).to_string(), webpp::stacked_exception, "no array in this node");
+    texcept(ctx.get("testek").render(rnd).xml().to_string(), webpp::stacked_exception, "no array in this node");
 
 	auto& array = rnd.create_array("abuserzy");
 
@@ -266,11 +266,11 @@ void t9() {
 
 	a.find("level").create_value(M_PI);
 	b.find("level").create_value(M_PI_4);
-	tequal(ctx.get("testek").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root><p data-level=\"3.1415926535897931\">abuser asdf, poziom 3.1</p><p data-level=\"0.78539816339744828\">abuser abuser, poziom 0.8</p></root>\n");
+    tequal(ctx.get("testek").render(rnd).xml().to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root><p data-level=\"3.1415926535897931\">abuser asdf, poziom 3.1</p><p data-level=\"0.78539816339744828\">abuser abuser, poziom 0.8</p></root>\n");
 
 	// same as above, but repeat other then root's children
 	ctx.put("testek", "<root xmlns=\"webpp://xml\" xmlns:f=\"webpp://format\" xmlns:c=\"webpp://control\">foo!<div c:repeat=\"inner\" c:repeat-array=\"abuserzy\" c:repeat-variable=\"abuser\"><f:p f:data-level=\"#{abuser.level}\">abuser #{abuser.name}, poziom #{abuser.level|%.1f}</f:p></div>bar!</root>");
-	tequal(ctx.get("testek").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root>foo!<div><p data-level=\"3.1415926535897931\">abuser asdf, poziom 3.1</p><p data-level=\"0.78539816339744828\">abuser abuser, poziom 0.8</p></div>bar!</root>\n");
+    tequal(ctx.get("testek").render(rnd).xml().to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root>foo!<div><p data-level=\"3.1415926535897931\">abuser asdf, poziom 3.1</p><p data-level=\"0.78539816339744828\">abuser abuser, poziom 0.8</p></div>bar!</root>\n");
 }
 
 // control - outer repeat
@@ -283,11 +283,11 @@ void t10() {
 
 	// not possible repeat - outer on root element
 	ctx.put("testek", "<root xmlns=\"webpp://xml\" xmlns:c=\"webpp://control\" xmlns:f=\"webpp://format\" c:repeat=\"outer\" c:repeat-array=\"abuserzy\" c:repeat-variable=\"abuser\"><f:p>abuser #{abuser.name}, poziom #{abuser.level|%.1f}</f:p></root>");
-	texcept(ctx.get("testek").render(rnd).to_string(), webpp::stacked_exception, "outer repeat on root element is not possible");
+    texcept(ctx.get("testek").render(rnd).xml().to_string(), webpp::stacked_exception, "outer repeat on root element is not possible");
 
 	// empty array
 	ctx.put("testek", "<root xmlns=\"webpp://xml\" xmlns:c=\"webpp://control\" xmlns:f=\"webpp://format\"><foo/><div c:repeat=\"outer\" c:repeat-array=\"abuserzy\" c:repeat-variable=\"abuser\" f:data-level=\"dec(#{abuser.level|%03.4f})\"><f:p>abuser #{abuser.name}, poziom #{abuser.level|%.1f}</f:p></div><bar/></root>");
-	texcept(ctx.get("testek").render(rnd).to_string(),webpp::stacked_exception, "no array in this node");
+    texcept(ctx.get("testek").render(rnd).xml().to_string(),webpp::stacked_exception, "no array in this node");
 
 	auto& array = rnd.create_array("abuserzy");
 
@@ -299,11 +299,11 @@ void t10() {
 	b.find("name").create_value("abuser");
 
 	// missing variable inside repeat
-	texcept(ctx.get("testek").render(rnd).to_string(), webpp::stacked_exception, "format: required variable 'abuser.level' not found in render context");
+    texcept(ctx.get("testek").render(rnd).xml().to_string(), webpp::stacked_exception, "format: required variable 'abuser.level' not found in render context");
 
 	a.find("level").create_value(M_PI);
 	b.find("level").create_value(M_PI_4);
-	tequal(ctx.get("testek").render(rnd).to_string(),"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root><foo/><div data-level=\"dec(3.1416)\"><p>abuser asdf, poziom 3.1</p></div><div data-level=\"dec(0.7854)\"><p>abuser abuser, poziom 0.8</p></div><bar/></root>\n");
+    tequal(ctx.get("testek").render(rnd).xml().to_string(),"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root><foo/><div data-level=\"dec(3.1416)\"><p>abuser asdf, poziom 3.1</p></div><div data-level=\"dec(0.7854)\"><p>abuser abuser, poziom 0.8</p></div><bar/></root>\n");
 }
 
 // render context - lazy evaluated array
@@ -341,7 +341,7 @@ void t11() {
 	rnd.get("abuserzy").create_array<test_dynamic_array>();
 
 	ctx.put("testek", "<root xmlns=\"webpp://xml\" xmlns:c=\"webpp://control\" xmlns:f=\"webpp://format\"><foo/><div c:repeat=\"outer\" c:repeat-array=\"abuserzy\" c:repeat-variable=\"abuser\" f:data-level=\"dec(#{abuser.y|%03.4f})\"><f:p>x = #{abuser.x}, poziom #{abuser.y|%.1f}</f:p></div><bar/></root>");
-	tequal(ctx.get("testek").render(rnd).to_string(),"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root><foo/><div data-level=\"dec(1.0000)\"><p>x = 0, poziom 1.0</p></div><div data-level=\"dec(3.1416)\"><p>x = 1, poziom 3.1</p></div><div data-level=\"dec(9.8696)\"><p>x = 2, poziom 9.9</p></div><bar/></root>\n");
+    tequal(ctx.get("testek").render(rnd).xml().to_string(),"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root><foo/><div data-level=\"dec(1.0000)\"><p>x = 0, poziom 1.0</p></div><div data-level=\"dec(3.1416)\"><p>x = 1, poziom 3.1</p></div><div data-level=\"dec(9.8696)\"><p>x = 2, poziom 9.9</p></div><bar/></root>\n");
 }
 
 // c:insert, insert view into current node
@@ -360,12 +360,12 @@ void t12() {
     rnd.create_value("numberofthebeast", 667);
     rnd.create_value("foo.bar.numberofthebeast", 666);
 
-    tequal(ctx.get("testek1").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root> <foo/><b data-notb=\"667\">notb = 667</b><bar/></root>\n");
-    tequal(ctx.get("testek2").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root> <foo/><b data-notb=\"666\">notb = 666</b><bar/></root>\n");
+    tequal(ctx.get("testek1").render(rnd).xml().to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root> <foo/><b data-notb=\"667\">notb = 667</b><bar/></root>\n");
+    tequal(ctx.get("testek2").render(rnd).xml().to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root> <foo/><b data-notb=\"666\">notb = 666</b><bar/></root>\n");
 
     // and once again
-    tequal(ctx.get("testek1").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root> <foo/><b data-notb=\"667\">notb = 667</b><bar/></root>\n");
-    tequal(ctx.get("testek2").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root> <foo/><b data-notb=\"666\">notb = 666</b><bar/></root>\n");
+    tequal(ctx.get("testek1").render(rnd).xml().to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root> <foo/><b data-notb=\"667\">notb = 667</b><bar/></root>\n");
+    tequal(ctx.get("testek2").render(rnd).xml().to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root> <foo/><b data-notb=\"666\">notb = 666</b><bar/></root>\n");
     
     // more complicated 
 
@@ -375,7 +375,26 @@ void t12() {
     
     ctx.put("testek3", "<root xmlns=\"webpp://xml\" xmlns:c=\"webpp://control\" xmlns:f=\"webpp://format\"> <foo /><c:insert c:repeat=\"outer\" c:repeat-variable=\"notb\" c:repeat-array=\"beasts\" name=\"innertestek\" value-prefix=\"notb\" /><bar /></root>");
 
-    tequal(ctx.get("testek3").render(rnd).to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root> <foo/><b data-notb=\"42\">notb = 42</b><b data-notb=\"139\">notb = 139</b><bar/></root>\n");
+    tequal(ctx.get("testek3").render(rnd).xml().to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root> <foo/><b data-notb=\"42\">notb = 42</b><b data-notb=\"139\">notb = 139</b><bar/></root>\n");
+}
+
+void t13() {
+    tbegin("Test 13: html5 bolilerplate loading, parsing and writing");
+
+    webpp::xml::context ctx("../tests");
+    webpp::xml::render::context rnd;
+
+    ctx.load_taglib<webpp::xml::taglib::basic>();
+
+    std::ifstream resultfs("../tests/boilerplate.output");
+    resultfs.seekg(0, std::ios_base::end);
+    std::size_t rsize = resultfs.tellg();
+    resultfs.seekg(0, std::ios_base::beg);
+    std::vector<char> expected;
+    expected.reserve(rsize+1);
+    expected[rsize] = 0;
+    resultfs.read(expected.data(), rsize);
+    tequal(ctx.get("boilerplate").render(rnd).xml().to_string(), std::string(expected.data()));
 }
 
 
@@ -393,5 +412,6 @@ int main()
 	t10();
 	t11();
     t12();
+    t13();
 	return 0;
 }

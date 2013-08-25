@@ -17,11 +17,19 @@ namespace webpp { namespace xml {
 		std::swap(output_, orig.output_);
 	}
 
-	Glib::ustring fragment_output::to_string() const {
+    Glib::ustring fragment_output::to_string() const {
 		STACKED_EXCEPTIONS_ENTER();
 		return output_->write_to_string();
 		STACKED_EXCEPTIONS_LEAVE("");
 	}
+
+    fragment_output& fragment_output::xml() {
+        return *this;
+    }
+
+    fragment_output& fragment_output::xhtml5(fragment_output::html5_encoding encoding) {
+        return *this;
+    }
 
 
 	/// Load fragment from file 'filename', fragment name is filename
@@ -55,8 +63,25 @@ namespace webpp { namespace xml {
 		fragment_output result(name_);
 		xmlpp::Document& output = result.document();
 		xmlpp::Element* src = reader_.get_document()->get_root_node();
-		output.create_root_node(src->get_name());
-		xmlpp::Element* dst = output.get_root_node();
+
+        // copy children prev and next to root element, without processing (comments...)
+        for(xmlNode* i = reader_.get_document()->cobj()->children; i != src->cobj() && i != nullptr; i = i->next) {
+            if(i->type == XML_COMMENT_NODE) {
+                const xmlChar* comment = xmlNodeGetContent(i);
+                output.add_comment(Glib::ustring(reinterpret_cast<const char*>(comment)));
+            }
+        }
+
+        output.create_root_node(src->get_name());
+        xmlpp::Element* dst = output.get_root_node();
+
+        for(xmlNode* i = src->cobj(); i != nullptr; i = i->next) {
+            if(i->type == XML_COMMENT_NODE) {
+                const xmlChar* comment = xmlNodeGetContent(i);
+                output.add_comment(Glib::ustring(reinterpret_cast<const char*>(comment)));
+            }
+        }
+
 		process_node(src, dst, rnd);
 		return result;
 		STACKED_EXCEPTIONS_LEAVE("fragment '" + name_ + "'");
@@ -70,7 +95,7 @@ namespace webpp { namespace xml {
 	/// Load fragment 'name' from file in library
 	void context::load(const std::string& name) {
 		STACKED_EXCEPTIONS_ENTER();
-		fragments_.emplace(name, std::make_shared<fragment>( (library_directory_ / name).string(), *this));
+        fragments_.emplace(name, std::make_shared<fragment>( (library_directory_ / name).string() + ".xml", *this));
 		STACKED_EXCEPTIONS_LEAVE("loading file " + name);
 	}
 
