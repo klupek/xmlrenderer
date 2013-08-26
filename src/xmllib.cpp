@@ -33,7 +33,6 @@ namespace webpp { namespace xml {
     }
 
     fragment_output& fragment_output::xhtml5(int xhtml5_encoding) {
-        xmlpp::Document *x = output_.get();
         if(xhtml5_encoding & DOCTYPE) {
             xmlpp::Document *d = output_.get();
             d->set_internal_subset("html",Glib::ustring(), Glib::ustring());
@@ -49,8 +48,11 @@ namespace webpp { namespace xml {
                 if(i->type == XML_COMMENT_NODE) {
                     xmlNode* tmp = i;
                     i = i->next;
+                    // libxml++ private empty object
+                    delete tmp->_private;
                     xmlUnlinkNode(tmp);
-                    xmlFree(tmp);
+                    xmlFreeNode(tmp);
+
                 } else
                     i = i->next;
             }
@@ -98,17 +100,18 @@ namespace webpp { namespace xml {
 	}
 */
 
-	fragment_output fragment::render(render::context& rnd) {
+    fragment_output prepared_fragment::render(render::context& rnd) {
 		STACKED_EXCEPTIONS_ENTER();
-		fragment_output result(name_);
+        fragment_output result(fragment_.name());
 		xmlpp::Document& output = result.document();
-		xmlpp::Element* src = reader_.get_document()->get_root_node();
+        xmlpp::Element* src = fragment_.reader().get_document()->get_root_node();
 
         // copy children prev and next to root element, without processing (comments...)
-        for(xmlNode* i = reader_.get_document()->cobj()->children; i != src->cobj() && i != nullptr; i = i->next) {
+        for(xmlNode* i = fragment_.reader().get_document()->cobj()->children; i != src->cobj() && i != nullptr; i = i->next) {
             if(i->type == XML_COMMENT_NODE) {
-                const xmlChar* comment = xmlNodeGetContent(i);
+                xmlChar* comment = xmlNodeGetContent(i);
                 output.add_comment(Glib::ustring(reinterpret_cast<const char*>(comment)));
+                xmlFree(comment);
             }
         }
 
@@ -117,14 +120,15 @@ namespace webpp { namespace xml {
 
         for(xmlNode* i = src->cobj(); i != nullptr; i = i->next) {
             if(i->type == XML_COMMENT_NODE) {
-                const xmlChar* comment = xmlNodeGetContent(i);
+                xmlChar* comment = xmlNodeGetContent(i);
                 output.add_comment(Glib::ustring(reinterpret_cast<const char*>(comment)));
+                xmlFree(comment);
             }
         }
 
         process_node(src, output, dst, rnd);
 		return result;
-		STACKED_EXCEPTIONS_LEAVE("fragment '" + name_ + "'");
+        STACKED_EXCEPTIONS_LEAVE("fragment '" + fragment_.name() + "'");
 	}		
 
 	/// Construct context; library_directory is directory root for fragment XML files
@@ -147,7 +151,7 @@ namespace webpp { namespace xml {
 	}
 
 	/// find fragment by 'name', load it from library if not loaded yet.
-	fragment& context::get(const Glib::ustring& name) {
+    prepared_fragment context::get(const Glib::ustring& name) {
 		STACKED_EXCEPTIONS_ENTER();
 		auto i = fragments_.find(name);
 		if(i == fragments_.end()) {
@@ -158,7 +162,7 @@ namespace webpp { namespace xml {
 		if(i == fragments_.end())
 			throw std::runtime_error("webpp::xml::context::get(): required fragment '" + name + "' not found");
 		else
-			return *i->second;
+            return prepared_fragment(*i->second, *this);
 		STACKED_EXCEPTIONS_LEAVE("fragment name " + name);
 	}
 
@@ -184,7 +188,7 @@ namespace webpp { namespace xml {
 	}
 
 
-    void fragment::process_node(const xmlpp::Element* src, xmlpp::Document& output, xmlpp::Element* dst, render::context& rnd, bool already_processing_outer_repeat) {
+    void prepared_fragment::process_node(const xmlpp::Element* src, xmlpp::Document& output, xmlpp::Element* dst, render::context& rnd, bool already_processing_outer_repeat) {
 		STACKED_EXCEPTIONS_ENTER();
 
 		Glib::ustring repeat_variable, repeat_array;
@@ -245,7 +249,13 @@ namespace webpp { namespace xml {
 				parent->remove_child(dst);
 		} else if(repeat_type != outer) {
 			// element is visible AND it is not outer repeat
-            if(src->get_namespace_uri() == "webpp://html5" || src->get_namespace_uri() == "webpp://xml" || src->get_namespace_uri().find("webpp://") == Glib::ustring::npos) {
+            xmlpp::Attribute *id_attribute = src->get_attribute("id");
+            view_insertions_t::const_iterator view_insertion_iterator = view_insertions_.end();
+            if(id_attribute != nullptr)
+                view_insertion_iterator = view_insertions_.find(id_attribute->get_value());
+
+            if(view_insertion_iterator == view_insertions_.end() &&
+                    (src->get_namespace_uri() == "webpp://html5" || src->get_namespace_uri() == "webpp://xml" || src->get_namespace_uri().find("webpp://") == Glib::ustring::npos) ) {
                 if(src->get_namespace_uri() == "webpp://html5")
                     output.get_root_node()->set_namespace_declaration("http://www.w3.org/1999/xhtml");
                 else if(src->get_namespace_uri() != "webpp://xml") {
@@ -271,7 +281,7 @@ namespace webpp { namespace xml {
 				}
 			} else {
 				nochildren = true; // custom tags handle their children				
-                if(src->get_namespace_uri() == "webpp://control") {
+                if(src->get_namespace_uri() == "webpp://control" || view_insertion_iterator != view_insertions_.end()) {
                     // handle all c: internally
                     if(src->get_name() == "insert") {
                         if(src->get_attribute("name") == nullptr)
@@ -279,8 +289,13 @@ namespace webpp { namespace xml {
                         if(src->get_attribute("value-prefix") == nullptr)
                             throw std::runtime_error("webpp://control:insert requires attribute value-prefix (prefix for render context variables)");
                         rnd.push_prefix(src->get_attribute("value-prefix")->get_value());
-                        auto &subdoc = context_.get(src->get_attribute("name")->get_value());
-                        subdoc.process_node(subdoc.reader_.get_document()->get_root_node(), output, dst, rnd);
+                        auto subdoc = context_.get(src->get_attribute("name")->get_value());
+                        subdoc.process_node(subdoc.get_fragment().reader().get_document()->get_root_node(), output, dst, rnd);
+                        rnd.pop_prefix();
+                    } else if(view_insertion_iterator != view_insertions_.end()) {
+                        rnd.push_prefix(view_insertion_iterator->second.value_prefix);
+                        auto subdoc = context_.get(view_insertion_iterator->second.view_name);
+                        subdoc.process_node(subdoc.get_fragment().reader().get_document()->get_root_node(), output, dst, rnd);
                         rnd.pop_prefix();
                     } else {
                         throw std::runtime_error("unknown webpp://control tag: " + src->get_name());
@@ -340,7 +355,7 @@ namespace webpp { namespace xml {
         STACKED_EXCEPTIONS_LEAVE("node " + src->get_namespace_uri() + ":" + src->get_name() + " at line " + boost::lexical_cast<std::string>(src->get_line()));
 	}
 
-    void fragment::process_children(const xmlpp::Element* src, xmlpp::Document& output, xmlpp::Element* dst, render::context& rnd) {
+    void prepared_fragment::process_children(const xmlpp::Element* src, xmlpp::Document& output, xmlpp::Element* dst, render::context& rnd) {
 		STACKED_EXCEPTIONS_ENTER();
 		for(auto child : src->get_children()) {
 			const xmlpp::Element* childelement = dynamic_cast<xmlpp::Element*>(child);

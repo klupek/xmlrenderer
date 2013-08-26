@@ -84,12 +84,14 @@ void t4() {
 	webpp::xml::context ctx(".");
 	webpp::xml::render::context rnd;
 	webpp::xml::fragment f1("testek", "<rootnode xmlns=\"webpp://xml\"></rootnode>", ctx);
-    tequal(f1.render(rnd).xml().to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode/>\n");
+    webpp::xml::prepared_fragment pf1(f1, ctx);
+    tequal(pf1.render(rnd).xml().to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode/>\n");
 
 
 	webpp::xml::fragment f2("testek2", "<rootnode2 xmlns=\"webpp://xml\"><asdf foo=\"bar\"/><foobar/><!-- test --></rootnode2>", ctx);
+    webpp::xml::prepared_fragment pf2(f2, ctx);
 
-    tequal(f2.render(rnd).xml().to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode2><asdf foo=\"bar\"/><foobar/><!-- test --></rootnode2>\n");
+    tequal(pf2.render(rnd).xml().to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode2><asdf foo=\"bar\"/><foobar/><!-- test --></rootnode2>\n");
 }
 
 // same as above, but use proper context loading
@@ -425,6 +427,31 @@ void t14() {
                 .to_string(), std::string(expected.data()));
 }
 
+void t15() {
+    tbegin("Test 15: subview insertion and render");
+
+    webpp::xml::context ctx("../tests");
+    webpp::xml::render::context rnd;
+
+    ctx.load_taglib<webpp::xml::taglib::basic>();
+    ctx.put("testek", "<root xmlns=\"webpp://xml\" xmlns:c=\"webpp://control\" xmlns:f=\"webpp://format\"> <foo /><div id=\"content\" /><bar /></root>");
+    ctx.put("innertestek", "<f:b xmlns=\"webpp://xml\" xmlns:f=\"webpp://format\" f:data-notb=\"#{numberofthebeast}\">notb = #{numberofthebeast}</f:b>");
+
+    rnd.create_value("test-value-prefix.numberofthebeast", M_PI);
+    rnd.create_value("numberofthebeast", 42);
+
+    tequal(
+        ctx.get("testek").insert("content", "innertestek", "test-value-prefix").render(rnd).xml().to_string(),
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root> <foo/><b data-notb=\"3.1415926535897931\">notb = 3.1415926535897931</b><bar/></root>\n"
+    );
+
+    tequal(
+        ctx.get("testek").insert("content", "innertestek", "").render(rnd).xml().to_string(),
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root> <foo/><b data-notb=\"42\">notb = 42</b><bar/></root>\n"
+    );
+
+}
+
 
 int main()
 {
@@ -442,5 +469,6 @@ int main()
     t12();
     t13();
     t14();
+    t15();
 	return 0;
 }

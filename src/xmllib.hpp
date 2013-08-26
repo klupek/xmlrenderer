@@ -3,6 +3,7 @@
 
 #include <libxml++-2.6/libxml++/libxml++.h>
 #include <boost/format.hpp>
+#include <boost/container/flat_map.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/unordered_map.hpp>
@@ -308,44 +309,61 @@ namespace webpp { namespace xml {
 
         //! \brief Convert XML tree to valid HTML5 and add fixes (conditional <html> etc.)
         fragment_output& xhtml5(int html5_encoding);
-
+        inline xmlpp::Document& document() { return *output_; }
         Glib::ustring to_string() const;
 
 	private:
         void remove_comments(xmlpp::Element*);
-		inline xmlpp::Document& document() { return *output_; }
-
-		friend class fragment;
-	};
+    };
 
 	/// \brief Piece of html5/xml, which is stored and then rendered using render::context and its values
 	class fragment : public boost::noncopyable {
 		const Glib::ustring name_;
 		context& context_;
 		xmlpp::DomParser reader_;
+
 	public:
 		/// \brief Load fragment from file 'filename'
 		fragment(const Glib::ustring& filename, context& ctx);
 		
 		/// \brief Load fragment from string 'buffer'
-		fragment(const Glib::ustring& name, const Glib::ustring& buffer, context& ctx);
-		
-		fragment(const fragment&) = delete;
-		fragment& operator=(const fragment&) = delete;
-				
-		/// \brief render this fragment, return XML in string
-		fragment_output render(render::context& rnd);
-	private:
-		// list of modifiers for single attribute
-		typedef std::map<Glib::ustring, Glib::ustring> modifier_list_t;
-		// list of attribute with modifiers
-		typedef std::map<Glib::ustring, modifier_list_t> modifier_map_t;
+		fragment(const Glib::ustring& name, const Glib::ustring& buffer, context& ctx);						
 
-		/// \brief Process node 'src' and its children, put generated output into 'dst'
+        inline const Glib::ustring& name() const { return name_; }
+        inline const xmlpp::DomParser& reader() const { return reader_; }
+    };
+
+    /// \brief Prepared fragment
+    class prepared_fragment {
+        const fragment& fragment_;
+        context& context_;
+        struct view_insertion {
+            Glib::ustring view_name, value_prefix;
+        };
+
+        typedef boost::container::flat_map<Glib::ustring, view_insertion> view_insertions_t;
+        view_insertions_t view_insertions_;
+
+    public:
+        prepared_fragment(const fragment& fragment, context& ctx) : fragment_(fragment), context_(ctx) {}
+
+        /// \brief render this fragment, return XML in string
+        fragment_output render(render::context& rnd);
+
+        /// \brief Add view 'view_name' to node with id='id'
+        inline prepared_fragment& insert(const Glib::ustring& id, const Glib::ustring& view_name, const Glib::ustring& value_prefix) {
+            view_insertions_[id] = view_insertion { view_name, value_prefix };
+            return *this;
+        }
+
+        inline const fragment& get_fragment() const { return fragment_; }
+
+    private:
+        /// \brief Process node 'src' and its children, put generated output into 'dst'
         void process_node(const xmlpp::Element* src, xmlpp::Document& output, xmlpp::Element* dst, render::context& rnd, bool already_processing_outer_repeat = false);
-		/// \brief Process children of 'src' and put generated output as children of 'dst
+        /// \brief Process children of 'src' and put generated output as children of 'dst
         void process_children(const xmlpp::Element* src, xmlpp::Document& output, xmlpp::Element* dst, render::context& rnd);
-	};
+    };
 	
 	
 	/*! \brief Handler for custom XML tags
@@ -402,7 +420,7 @@ namespace webpp { namespace xml {
 		}
 
 		/// \brief Find or load fragment named 'name', throw exception if not found
-		fragment&  get(const Glib::ustring& name);
+        prepared_fragment  get(const Glib::ustring& name);
 
 		/*! \brief Find tag handler named 'name' in 'ns' namespace, returns nullptr if not found
 		 * 	\param ns namespace URI
