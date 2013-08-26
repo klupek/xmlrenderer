@@ -407,7 +407,22 @@ void t14() {
     expected.reserve(rsize+1);
     expected[rsize] = 0;
     resultfs.read(expected.data(), rsize);
-    tequal(ctx.get("boilerplate").render(rnd).xml().to_string(), std::string(expected.data()));
+
+    tequal(ctx.get("boilerplate").render(rnd).xhtml5(webpp::xml::fragment_output::DOCTYPE | webpp::xml::fragment_output::REMOVE_XML_DECLARATION).to_string(), std::string(expected.data()));
+
+    std::ifstream result2fs("../tests/boilerplate-nocomment.output");
+    result2fs.seekg(0, std::ios_base::end);
+    rsize = result2fs.tellg();
+    result2fs.seekg(0, std::ios_base::beg);
+    expected.reserve(rsize+1);
+    expected[rsize] = 0;
+    result2fs.read(expected.data(), rsize);
+
+    tequal(
+           ctx.get("boilerplate")
+                .render(rnd)
+                .xhtml5(webpp::xml::fragment_output::DOCTYPE | webpp::xml::fragment_output::REMOVE_XML_DECLARATION | webpp::xml::fragment_output::REMOVE_COMMENTS)
+                .to_string(), std::string(expected.data()));
 }
 
 
@@ -426,5 +441,6 @@ int main()
 	t11();
     t12();
     t13();
+    t14();
 	return 0;
 }

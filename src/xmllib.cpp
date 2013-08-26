@@ -9,17 +9,22 @@
 
 namespace webpp { namespace xml { 
 	fragment_output::fragment_output(const Glib::ustring& name)
-		: name_(name), output_(new xmlpp::Document) {
+        : name_(name), output_(new xmlpp::Document), remove_xml_declaration_(false) {
 
 	}
 
-	fragment_output::fragment_output(fragment_output&& orig) : name_(orig.name_) {
+    fragment_output::fragment_output(fragment_output&& orig) : name_(orig.name_), remove_xml_declaration_(orig.remove_xml_declaration_) {
 		std::swap(output_, orig.output_);
 	}
 
     Glib::ustring fragment_output::to_string() const {
 		STACKED_EXCEPTIONS_ENTER();
-		return output_->write_to_string();
+        const Glib::ustring xml_declaration("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+        Glib::ustring result =  output_->write_to_string();
+        if(remove_xml_declaration_)
+            return result.substr(xml_declaration.length()); // or should it use .replace (slower) or other magic?
+        else
+            return result;
 		STACKED_EXCEPTIONS_LEAVE("");
 	}
 
@@ -27,8 +32,43 @@ namespace webpp { namespace xml {
         return *this;
     }
 
-    fragment_output& fragment_output::xhtml5(fragment_output::html5_encoding encoding) {
+    fragment_output& fragment_output::xhtml5(int xhtml5_encoding) {
+        xmlpp::Document *x = output_.get();
+        if(xhtml5_encoding & DOCTYPE) {
+            xmlpp::Document *d = output_.get();
+            d->set_internal_subset("html",Glib::ustring(), Glib::ustring());
+        }
+
+        if(xhtml5_encoding & REMOVE_XML_DECLARATION) {
+            remove_xml_declaration_ = true;
+        }
+
+        if(xhtml5_encoding & REMOVE_COMMENTS) {
+            // first process (pre|post)-root comments
+            for(xmlNode* i = output_->cobj()->children; i != nullptr;) {
+                if(i->type == XML_COMMENT_NODE) {
+                    xmlNode* tmp = i;
+                    i = i->next;
+                    xmlUnlinkNode(tmp);
+                    xmlFree(tmp);
+                } else
+                    i = i->next;
+            }
+            remove_comments(output_->get_root_node());
+        }
         return *this;
+    }
+
+    void fragment_output::remove_comments(xmlpp::Element* element) {
+        for(xmlpp::Node* i : element->get_children()) {
+            xmlpp::CommentNode* cn = dynamic_cast<xmlpp::CommentNode*>(i);
+            xmlpp::Element* e = dynamic_cast<xmlpp::Element*>(i);
+            if(cn != nullptr) {
+                element->remove_child(cn);
+            } else if(e != nullptr) {
+                remove_comments(e);
+            }
+        }
     }
 
 

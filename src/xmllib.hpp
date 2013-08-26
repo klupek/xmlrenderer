@@ -288,6 +288,7 @@ namespace webpp { namespace xml {
 	class fragment_output {
 		const Glib::ustring name_; // for exception decorating
 		std::unique_ptr<xmlpp::Document> output_; // mutable, because to_string() is obviously const, and libxml++ thinks different.
+        bool remove_xml_declaration_; // usefull for broken browsers
 	public:
 		/// \brief Construct empty document
 		fragment_output(const Glib::ustring& name);
@@ -299,17 +300,19 @@ namespace webpp { namespace xml {
         //! \brief Convert output to valid XML (currently: nothing to do)
         fragment_output& xml();
 
-        enum class html5_encoding {
-            BASIC, // add DOCTYPE, add xmlns to <html>
-            EXTENDED // BASIC + add conditional <html> ( generates <html> classes ie-lt9, ie-lt8, ie-lt7 )
+        enum xhtml5_encoding {
+            DOCTYPE = 1, // add xhtml5 doctype
+            REMOVE_XML_DECLARATION = 2, // remove <?xml ...
+            REMOVE_COMMENTS = 4 // remove all comments
         };
 
         //! \brief Convert XML tree to valid HTML5 and add fixes (conditional <html> etc.)
-        fragment_output& xhtml5(html5_encoding encoding);
+        fragment_output& xhtml5(int html5_encoding);
 
         Glib::ustring to_string() const;
 
 	private:
+        void remove_comments(xmlpp::Element*);
 		inline xmlpp::Document& document() { return *output_; }
 
 		friend class fragment;
