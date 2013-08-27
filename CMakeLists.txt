@@ -33,3 +33,5 @@ INCLUDE_DIRECTORIES(${LibXML++_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})
 
 add_executable(test1 tests/test.cpp src/xmllib.cpp src/taglib.hpp src/stacked_exception.cpp)
 target_link_libraries(test1 ${LibXML++_LIBRARIES} ${Boost_LIBRARIES})
+
+add_library(xmlrenderer src/xmllib.cpp src/taglib.hpp src/stacked_exception.cpp)

@@ -49,7 +49,8 @@ namespace webpp { namespace xml {
                     xmlNode* tmp = i;
                     i = i->next;
                     // libxml++ private empty object
-                    delete tmp->_private;
+                    xmlpp::CommentNode* tmp2 = static_cast<xmlpp::CommentNode*>(tmp->_private);
+                    delete tmp2;
                     xmlUnlinkNode(tmp);
                     xmlFreeNode(tmp);
 
