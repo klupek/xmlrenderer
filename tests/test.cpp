@@ -3,6 +3,19 @@
 #include "../src/stacked_exception.h"
 #include <cassert>
 
+std::string readfile(const std::string& name) {
+    auto filepath = (boost::filesystem::path(__FILE__).parent_path() / name).string();
+    std::ifstream ifs(filepath);
+    ifs.seekg(0, std::ios_base::end);
+    std::vector<char> result;
+    std::size_t size = ifs.tellg();
+    result.reserve(size+1);
+    ifs.seekg(0, std::ios_base::beg);
+    ifs.read(result.data(), size);
+    ifs.close();
+    result[size] = 0;
+    return std::string(result.data());
+}
 
 #define tbegin(name) std::cout << name << std::endl
 #define tequal(a,b) if((a) != (b)) { std::cout << "\nFAIL: expected: " << b << "\nFAIL:   actual: " << a << std::endl; assert(false); }
@@ -383,7 +396,7 @@ void t12() {
 void t13() {
     tbegin("Test 13: test custom namespace");
 
-    webpp::xml::context ctx("../tests");
+    webpp::xml::context ctx(boost::filesystem::path(__FILE__).parent_path().string());
     webpp::xml::render::context rnd;
 
     ctx.load_taglib<webpp::xml::taglib::basic>();
@@ -396,41 +409,26 @@ void t13() {
 void t14() {
     tbegin("Test 14: html5 bolilerplate loading, parsing and writing");
 
-    webpp::xml::context ctx("../tests");
+    webpp::xml::context ctx(boost::filesystem::path(__FILE__).parent_path().string());
     webpp::xml::render::context rnd;
 
     ctx.load_taglib<webpp::xml::taglib::basic>();
 
-    std::ifstream resultfs("../tests/boilerplate.output");
-    resultfs.seekg(0, std::ios_base::end);
-    std::size_t rsize = resultfs.tellg();
-    resultfs.seekg(0, std::ios_base::beg);
-    std::vector<char> expected;
-    expected.reserve(rsize+1);
-    expected[rsize] = 0;
-    resultfs.read(expected.data(), rsize);
+    auto expected = readfile("boilerplate.output");
+    tequal(ctx.get("boilerplate").render(rnd).xhtml5(webpp::xml::fragment_output::DOCTYPE | webpp::xml::fragment_output::REMOVE_XML_DECLARATION).to_string(), expected);
 
-    tequal(ctx.get("boilerplate").render(rnd).xhtml5(webpp::xml::fragment_output::DOCTYPE | webpp::xml::fragment_output::REMOVE_XML_DECLARATION).to_string(), std::string(expected.data()));
-
-    std::ifstream result2fs("../tests/boilerplate-nocomment.output");
-    result2fs.seekg(0, std::ios_base::end);
-    rsize = result2fs.tellg();
-    result2fs.seekg(0, std::ios_base::beg);
-    expected.reserve(rsize+1);
-    expected[rsize] = 0;
-    result2fs.read(expected.data(), rsize);
-
+    auto expected2 = readfile("boilerplate-nocomment.output");
     tequal(
            ctx.get("boilerplate")
                 .render(rnd)
                 .xhtml5(webpp::xml::fragment_output::DOCTYPE | webpp::xml::fragment_output::REMOVE_XML_DECLARATION | webpp::xml::fragment_output::REMOVE_COMMENTS)
-                .to_string(), std::string(expected.data()));
+                .to_string(), expected2);
 }
 
 void t15() {
     tbegin("Test 15: subview insertion and render");
 
-    webpp::xml::context ctx("../tests");
+    webpp::xml::context ctx(boost::filesystem::path(__FILE__).parent_path().string());
     webpp::xml::render::context rnd;
 
     ctx.load_taglib<webpp::xml::taglib::basic>();
