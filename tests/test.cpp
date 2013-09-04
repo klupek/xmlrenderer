@@ -1,6 +1,5 @@
 
-#include "../src/xmllib.hpp"
-#include "../src/stacked_exception.h"
+#include "../xmlrenderer/xmlrenderer.hpp"
 #include <cassert>
 
 std::string readfile(const std::string& name) {
@@ -125,7 +124,6 @@ void t5() {
 	texcept(ctx.get("testek3").render(rnd), webpp::stacked_exception, "unknown attribute namespace  webpp://test");
 }
 
-#include "../src/taglib.hpp"
 
 // context with taglib - formatting tags
 void t6() {

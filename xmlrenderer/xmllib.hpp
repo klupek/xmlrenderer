@@ -1,5 +1,5 @@
-#ifndef WEBPP_XMLLIB
-#define WEBPP_XMLLIB
+#ifndef WEBPP_XMLRENDERER_XMLLIB_HPP
+#define WEBPP_XMLRENDERER_XMLLIB_HPP
 
 #include <libxml++-2.6/libxml++/libxml++.h>
 #include <boost/format.hpp>
@@ -433,4 +433,4 @@ namespace webpp { namespace xml {
 	};
 }}
 
-#endif // WEBPP_XMLLIB
+#endif // WEBPP_XMLRENDERER_XMLLIB_HPP

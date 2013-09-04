@@ -1,5 +1,5 @@
-#ifndef WEBPP_TAGLIB_HPP
-#define WEBPP_TAGLIB_HPP
+#ifndef WEBPP_XMLRENDERER_TAGLIB_HPP
+#define WEBPP_XMLRENDERER_TAGLIB_HPP
 
 #include "xmllib.hpp"
 #include "stacked_exception.h"
@@ -98,4 +98,4 @@ namespace webpp { namespace xml { namespace taglib {
 		}
 	};
 }}}
-#endif // WEBPP_TAGLIB_HPP
+#endif // WEBPP_XMLRENDERER_TAGLIB_HPP
