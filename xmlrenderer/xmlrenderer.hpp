@@ -1,0 +1,7 @@
+#ifndef WEBPP_XMLRENDERER_XMLRENDERER_HPP
+#define WEBPP_XMLRENDERER_XMLRENDERER_HPP
+
+#include "xmllib.hpp"
+#include "taglib.hpp"
+
+#endif // WEBPP_XMLRENDERER_XMLRENDERER_HPP
