@@ -28,7 +28,7 @@ set(Boost_USE_STATIC_RUNTIME OFF)
 FIND_PACKAGE(libxml++ REQUIRED)
 FIND_PACKAGE(Boost 1.53.0 COMPONENTS filesystem system REQUIRED)
 
-add_subdirectory(${xmlrenderer_SOURCE_DIR}/webpp-common)
+add_subdirectory(webpp-common)
 link_directories(${xmlrenderer_BINARY_DIR}/webpp-common)
 
 INCLUDE_DIRECTORIES(${xmlrenderer_SOURCE_DIR}/webpp-common ${LibXML++_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})
