@@ -1,5 +1,5 @@
 
-#include "../xmlrenderer/xmlrenderer.hpp"
+#include <xmlrenderer/xmlrenderer.hpp>
 #include <cassert>
 
 std::string readfile(const std::string& name) {

@@ -31,7 +31,7 @@ FIND_PACKAGE(Boost 1.53.0 COMPONENTS filesystem system REQUIRED)
 add_subdirectory(webpp-common)
 link_directories(${xmlrenderer_BINARY_DIR}/webpp-common)
 
-INCLUDE_DIRECTORIES(${xmlrenderer_SOURCE_DIR}/webpp-common ${LibXML++_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})
+INCLUDE_DIRECTORIES(${xmlrenderer_SOURCE_DIR}/webpp-common ${xmlrenderer_SOURCE_DIR} ${LibXML++_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})
  
 add_library(xmlrenderer xmlrenderer/xmllib.cpp xmlrenderer/taglib.hpp)
 target_link_libraries(xmlrenderer ${LibXML++_LIBRARIES} ${Boost_LIBRARIES} webpp-common)
