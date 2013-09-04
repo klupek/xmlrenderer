@@ -28,14 +28,17 @@ set(Boost_USE_STATIC_RUNTIME OFF)
 FIND_PACKAGE(libxml++ REQUIRED)
 FIND_PACKAGE(Boost 1.53.0 COMPONENTS filesystem system REQUIRED)
 
-INCLUDE_DIRECTORIES(${LibXML++_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})
+add_subdirectory(${xmlrenderer_SOURCE_DIR}/webpp-common)
+link_directories(${xmlrenderer_BINARY_DIR}/webpp-common)
+
+INCLUDE_DIRECTORIES(${xmlrenderer_SOURCE_DIR}/webpp-common ${LibXML++_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})
  
-add_library(xmlrenderer xmlrenderer/xmllib.cpp xmlrenderer/taglib.hpp xmlrenderer/stacked_exception.cpp)
-target_link_libraries(xmlrenderer ${LibXML++_LIBRARIES} ${Boost_LIBRARIES})
+add_library(xmlrenderer xmlrenderer/xmllib.cpp xmlrenderer/taglib.hpp)
+target_link_libraries(xmlrenderer ${LibXML++_LIBRARIES} ${Boost_LIBRARIES} webpp-common)
 
 ENABLE_TESTING()
-add_executable(test1 tests/test.cpp xmlrenderer/xmllib.cpp xmlrenderer/taglib.hpp xmlrenderer/stacked_exception.cpp)
-target_link_libraries(test1 ${LibXML++_LIBRARIES} ${Boost_LIBRARIES})
+add_executable(test1 tests/test.cpp xmlrenderer/xmllib.cpp xmlrenderer/taglib.hpp)
+target_link_libraries(test1 ${LibXML++_LIBRARIES} ${Boost_LIBRARIES} webpp-common)
 
 add_test(xmlrenderer-test ${xmlrenderer_BINARY_DIR}/test1)
 

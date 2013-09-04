@@ -22,7 +22,8 @@
 #include <list>
 #include <cstring>
 #include <cassert>
-#include "stacked_exception.h"
+
+#include <webpp-common/stacked_exception.hpp>
 namespace boost {
 	// forward hash<Glib::ustring> to std::string's hash
 	template<>

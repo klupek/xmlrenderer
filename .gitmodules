@@ -1,0 +1,3 @@
+[submodule "webpp-common"]
+	path = webpp-common
+	url = https://github.com/klupek/webpp-common.git

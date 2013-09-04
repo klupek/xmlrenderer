@@ -2,7 +2,7 @@
 #define WEBPP_XMLRENDERER_TAGLIB_HPP
 
 #include "xmllib.hpp"
-#include "stacked_exception.h"
+#include <webpp-common/stacked_exception.hpp>
 namespace webpp { namespace xml { namespace taglib {
 	/*! \brief XMLNS handler for formatting attributes
 	 *  \\example <a f:href="/users/#{user.name}" f:title="user #[user.name} - abuse level #{user.abuse|%.2f]">

@@ -5,7 +5,6 @@
 
 #include <iostream>
 #include <libxml/xpath.h>
-#include "stacked_exception.h"
 
 namespace webpp { namespace xml { 
 	fragment_output::fragment_output(const Glib::ustring& name)
