@@ -93,7 +93,7 @@ namespace webpp { namespace xml { namespace taglib {
 
 	struct basic {
 		template<typename TagsT, typename XmlnsesT>
-		static void process(TagsT& tags, XmlnsesT& xmlnses) {
+		static void process(TagsT&, XmlnsesT& xmlnses) {
 			xmlnses["webpp://format"].reset(new format_xmlns);
 		}
 	};
