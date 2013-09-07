@@ -262,8 +262,8 @@ namespace webpp { namespace xml {
                     output.get_root_node()->set_namespace_declaration(src->get_namespace_uri(), src->get_namespace_prefix());
                     dst->set_namespace(src->get_namespace_prefix());
                 }
+				dst->set_name(src->get_name());
 				// normal tag, process attributes                
-				// and every other attribute then
 				for(auto attribute : src->get_attributes()) {
 					const auto ns = attribute->get_namespace_uri();
 					const auto name = attribute->get_name();
@@ -295,6 +295,7 @@ namespace webpp { namespace xml {
                     } else if(view_insertion_iterator != view_insertions_.end()) {
                         rnd.push_prefix(view_insertion_iterator->second.value_prefix);
                         auto subdoc = context_.get(view_insertion_iterator->second.view_name);
+						subdoc.view_insertions_ = view_insertions_;
                         subdoc.process_node(subdoc.get_fragment().reader().get_document()->get_root_node(), output, dst, rnd);
 						dst->set_attribute("id", id_attribute->get_value());
                         rnd.pop_prefix();
