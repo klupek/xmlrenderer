@@ -438,12 +438,12 @@ void t15() {
 
     tequal(
         ctx.get("testek").insert("content", "innertestek", "test-value-prefix").render(rnd).xml().to_string(),
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root> <foo/><b data-notb=\"3.1415926535897931\">notb = 3.1415926535897931</b><bar/></root>\n"
+		"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root> <foo/><b data-notb=\"3.1415926535897931\" id=\"content\">notb = 3.1415926535897931</b><bar/></root>\n"
     );
 
     tequal(
         ctx.get("testek").insert("content", "innertestek", "").render(rnd).xml().to_string(),
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root> <foo/><b data-notb=\"42\">notb = 42</b><bar/></root>\n"
+		"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<root> <foo/><b data-notb=\"42\" id=\"content\">notb = 42</b><bar/></root>\n"
     );
 
 }

@@ -296,6 +296,7 @@ namespace webpp { namespace xml {
                         rnd.push_prefix(view_insertion_iterator->second.value_prefix);
                         auto subdoc = context_.get(view_insertion_iterator->second.view_name);
                         subdoc.process_node(subdoc.get_fragment().reader().get_document()->get_root_node(), output, dst, rnd);
+						dst->set_attribute("id", id_attribute->get_value());
                         rnd.pop_prefix();
                     } else {
                         throw std::runtime_error("unknown webpp://control tag: " + src->get_name());
