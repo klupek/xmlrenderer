@@ -462,6 +462,51 @@ namespace webpp { namespace xml {
         root_->find(key).create_link(orig.shared_from_this());
     }
 
+	// FIXME: needs tests.
+	node_iterator::node_iterator(xmlpp::Node* node)
+		: node_(node) {}
+
+	xmlpp::Node& node_iterator::operator*() {
+		assert(node_ != nullptr);
+		return *node_;
+	}
+
+	xmlpp::Node* node_iterator::operator->() {
+		assert(node_ != nullptr);
+		return node_;
+	}
+
+	node_iterator& node_iterator::operator++() {
+		increment();
+		return *this;
+	}
+
+	node_iterator node_iterator::operator++(int) {
+		node_iterator result(node_);
+		increment();
+		return result;
+	}
+
+	void node_iterator::increment() {
+		assert(node_ != nullptr);
+		xmlpp::Node* child = node_->get_first_child();
+		if(child != nullptr) {
+			node_ = child;
+			return;
+		}
+
+		xmlpp::Node* next;
+		xmlpp::Node* parent = node_;
+		// find next sibling or parents next sibling
+		do {
+			next = parent->get_next_sibling();
+			parent = parent->get_parent();
+		} while(parent != nullptr && next == nullptr);
+
+		// if found, next_ is next sibling, if not found, whole document was scanned and iterator now points end()
+		node_ = next;
+	}
+
 }}
 
 

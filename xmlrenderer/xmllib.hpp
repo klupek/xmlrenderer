@@ -281,6 +281,21 @@ namespace webpp { namespace xml {
 		};
 	}
 
+	class node_iterator {
+		xmlpp::Node* node_;
+	public:
+		node_iterator(xmlpp::Node* node);
+		xmlpp::Node& operator*();
+		xmlpp::Node* operator->();
+		node_iterator& operator++();
+		node_iterator operator++(int);
+		inline bool operator==(const node_iterator& rhs) { return node_ == rhs.node_; }
+		inline bool operator!=(const node_iterator& rhs) { return node_ != rhs.node_; }
+		inline xmlpp::Element* element() { return dynamic_cast<xmlpp::Element*>(node_); }
+
+	private:
+		void increment();
+	};
 
 	class context;
 // short macro for checking existance of variable in rendering context
@@ -290,7 +305,7 @@ namespace webpp { namespace xml {
 	class fragment_output {
 		const Glib::ustring name_; // for exception decorating
 		std::unique_ptr<xmlpp::Document> output_; // mutable, because to_string() is obviously const, and libxml++ thinks different.
-        bool remove_xml_declaration_; // usefull for broken browsers
+        bool remove_xml_declaration_; // usefull for broken browsers		
 	public:
 		/// \brief Construct empty document
 		fragment_output(const Glib::ustring& name);
@@ -313,6 +328,8 @@ namespace webpp { namespace xml {
         inline xmlpp::Document& document() { return *output_; }
         Glib::ustring to_string() const;
 
+		inline node_iterator begin() { return node_iterator(output_.get()->get_root_node()); }
+		inline node_iterator end() { return node_iterator(nullptr); }
 	private:
         void remove_comments(xmlpp::Element*);
     };
