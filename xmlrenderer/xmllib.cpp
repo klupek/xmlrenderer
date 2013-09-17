@@ -414,13 +414,13 @@ namespace webpp { namespace xml {
             if(position == Glib::ustring::npos) {
                 auto& result = self()->children_[key.substr(0, position)];
                 if(!result)
-                    result.reset(new tree_element);
+					result = std::make_shared<tree_element>();
                 return *result;
 
             } else {
                 auto& result = self()->children_[key.substr(0, position)];
                 if(!result)
-                    result.reset(new tree_element);
+					result = std::make_shared<tree_element>();
                 return result->find(key.substr(position+1));
             }
         }
