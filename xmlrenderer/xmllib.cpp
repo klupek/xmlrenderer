@@ -439,20 +439,31 @@ namespace webpp { namespace xml {
         return *self()->array_;
     }
 
-    void render::tree_element::debug(int tab) const {
-        if(is_value())
-            std::cout << std::setw(tab*5) << "" << "value: " << value_->output() << std::endl;
+	void render::tree_element::debug(const std::string& prefix, int tab) const {
+		if(is_value()) {
+			std::string val;
+			try {
+				val = value_->output();
+			} catch(...) {
+				val = "(not serializable)";
+			}
+
+			std::cout << prefix << " = " << val << ";\n";
+		}
+
+
         if(is_array()) {
-            std::cout << std::setw(tab*5) << "" << "array elements:\n";
             auto& array = *self()->array_;
+			int i = 0;
             array.reset();
-            while(array.has_next())
-                array.next().debug(tab+1);
+			while(array.has_next()) {
+				array.next().debug(prefix + "["+ boost::lexical_cast<std::string>(i) + "]", tab+1);
+				++i;
+			}
         }
         if(!self()->children_.empty()) {
-            for(auto& child : self()->children_) {
-                std::cout << std::setw((tab+1)*5) << "" << "child " << child.first << std::endl;
-                child.second->debug(tab+2);
+			for(auto& child : self()->children_) {
+				child.second->debug(prefix + "/" + child.first, tab+2);
             }
         }
     }

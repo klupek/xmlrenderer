@@ -69,6 +69,11 @@ namespace webpp { namespace xml {
 				STACKED_EXCEPTIONS_LEAVE("");
 			}
 		};
+
+		template<>
+		inline Glib::ustring value<Glib::ustring>::output() const {
+			return value_;
+		}
 	
 		// char literals are stored as Glib::ustring
 		template< std::size_t N >
@@ -76,6 +81,14 @@ namespace webpp { namespace xml {
 		public:
 			value(const char v[N])
 				: value<Glib::ustring>(v) {}
+		};
+
+		template<>
+		class value<std::string> : public value<Glib::ustring> {
+		public:
+			inline value(const std::string& v)
+				: value<Glib::ustring>(v) {}
+
 		};
 
 		//! \brief Lazy evaluated function/lambda/bind/any callable. Will execute once requested from renderer and then value will be cached.
@@ -207,7 +220,7 @@ namespace webpp { namespace xml {
                 return *dynamic_cast<ArrayT*>(self()->array_.get());
 			}
 
-            virtual void debug(int tab = 0) const;
+			virtual void debug(const std::string& prefix = "/", int tab = 0) const;
         };
 
 

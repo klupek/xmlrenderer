@@ -56,14 +56,14 @@ namespace webpp { namespace xml { namespace taglib {
                 target = dst;
                 target->set_name(src->get_name());
 				for(const xmlpp::Attribute* i : src->get_attributes()) {
-					if(i->get_namespace_uri() == "webpp://xml" || i->get_namespace_uri() == "webpp://html5") {
+					if(i->get_namespace_uri() == "" || i->get_namespace_uri() == "webpp://xml" || i->get_namespace_uri() == "webpp://html5") {
 						target->set_attribute(i->get_name(), i->get_value());
 					} else if(i->get_namespace_uri() == "webpp://format") {
 						attribute(target, i, ctx);
 					} else if(i->get_namespace_uri() == "webpp://control") {
 						// ignore control attributes, core handles it
 					} else {
-						throw std::runtime_error("webpp://format tags support only XML/HTML5/webpp://format attributes, not " + i->get_namespace_uri());
+						throw std::runtime_error("webpp://format tags support only XML/HTML5/webpp://format attributes, not " + i->get_namespace_uri() + " namespace");
 					}
 				}
 			}
