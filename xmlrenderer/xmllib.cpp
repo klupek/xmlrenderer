@@ -339,11 +339,11 @@ namespace webpp { namespace xml {
 				throw std::runtime_error("repeat attribute set, but repeat_variable or repeat_array is not set");
 			// we need to repeat whole xml element
 			auto& array = rnd.get(repeat_array).get_array();
+			array.reset();
 			if(array.empty())
 				dst->get_parent()->remove_child(dst);
 			else {
 				xmlpp::Element* currentdst = dst;
-				array.reset();
 				while(array.has_next()) {
 					// first setup context variable
 					rnd.import_subtree(repeat_variable, array.next());
