@@ -3,10 +3,10 @@
 
 #include <libxml++-2.6/libxml++/libxml++.h>
 
-#include <libxslt/xslt.h>
-#include <libxslt/xsltInternals.h>
-#include <libxslt/transform.h>
-#include <libxslt/xsltutils.h>
+extern "C" {
+	struct _xsltStylesheet;
+	typedef struct _xsltStylesheet xsltStylesheet;
+}
 
 #include <boost/format.hpp>
 #include <boost/container/flat_map.hpp>

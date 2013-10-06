@@ -3,8 +3,17 @@
 
 #include "xmllib.hpp"
 
+extern "C" {
+	#include <libxslt/xslt.h>
+	#include <libxslt/xsltInternals.h>
+	#include <libxslt/transform.h>
+	#include <libxslt/xsltutils.h>
+}
+
 #include <iostream>
-#include <libxml/xpath.h>
+extern "C" {
+	#include <libxml/xpath.h>
+}
 
 namespace webpp { namespace xml { 
 	fragment_output::fragment_output(const Glib::ustring& name)
