@@ -2,6 +2,12 @@
 #define WEBPP_XMLRENDERER_XMLLIB_HPP
 
 #include <libxml++-2.6/libxml++/libxml++.h>
+
+#include <libxslt/xslt.h>
+#include <libxslt/xsltInternals.h>
+#include <libxslt/transform.h>
+#include <libxslt/xsltutils.h>
+
 #include <boost/format.hpp>
 #include <boost/container/flat_map.hpp>
 #include <boost/filesystem.hpp>
@@ -352,7 +358,7 @@ namespace webpp { namespace xml {
 		const Glib::ustring name_;
 		context& context_;
 		xmlpp::DomParser reader_;
-
+		std::unique_ptr<xmlpp::Document> processed_document_;
 	public:
 		/// \brief Load fragment from file 'filename'
 		fragment(const Glib::ustring& filename, context& ctx);
@@ -361,7 +367,10 @@ namespace webpp { namespace xml {
 		fragment(const Glib::ustring& name, const Glib::ustring& buffer, context& ctx);						
 
         inline const Glib::ustring& name() const { return name_; }
-        inline const xmlpp::DomParser& reader() const { return reader_; }
+		inline xmlpp::Document& get_document() { return processed_document_ ? *processed_document_ : *reader_.get_document(); }
+		inline const xmlpp::Document& get_document() const { return processed_document_ ? *processed_document_ : *reader_.get_document(); }
+	private:
+		void apply_stylesheets();
     };
 
     /// \brief Prepared fragment
@@ -427,12 +436,18 @@ namespace webpp { namespace xml {
 		boost::unordered_map<std::pair<Glib::ustring,Glib::ustring>, std::unique_ptr<tag> > tags_;
 		/// <a href.value="variable-name" href.format="%.3lf">
 		boost::unordered_map<Glib::ustring, std::unique_ptr<xmlns>> xmlnses_;
-		
+		typedef std::list<std::shared_ptr<xsltStylesheet>> stylesheets_t;
+		stylesheets_t stylesheets_;
 	public:		
 		/*! \brief Construct context
 		 * 	\param library_directory directory with fragment files
 		 */
 		context(const std::string& library_directory);
+
+		/*! \brief Attach XSLT stylesheet for newly loaded documents. Only future loaded fragments will be affected.
+		 *  \param name XSLT stylesheet path in library
+		 */
+		void attach_xslt(const std::string& name);
 
 		/*! \brief Load fragment from library
 		 * 	\param name fragment path in library
@@ -461,6 +476,8 @@ namespace webpp { namespace xml {
 		
 		/// \brief Find xmlns handler for uri 'ns', returns nullptr if not found
 		const xmlns* find_xmlns(const Glib::ustring& ns);
+
+		inline const stylesheets_t& get_stylesheets() { return stylesheets_; }
 	};
 }}
 

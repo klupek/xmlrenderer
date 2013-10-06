@@ -25,15 +25,16 @@ set(Boost_USE_MULTITHREADED ON)
 set(Boost_USE_STATIC_RUNTIME OFF)
 
 FIND_PACKAGE(libxml++ REQUIRED)
+FIND_PACKAGE(libxslt REQUIRED)
 FIND_PACKAGE(Boost 1.53.0 COMPONENTS filesystem system unit_test_framework REQUIRED)
 
 add_subdirectory(webpp-common)
 link_directories(${xmlrenderer_BINARY_DIR}/webpp-common)
 
-INCLUDE_DIRECTORIES(${xmlrenderer_SOURCE_DIR}/webpp-common ${xmlrenderer_SOURCE_DIR} ${LibXML++_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})
+INCLUDE_DIRECTORIES(${xmlrenderer_SOURCE_DIR}/webpp-common ${xmlrenderer_SOURCE_DIR} ${LibXML++_INCLUDE_DIRS} ${LibXSLT_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})
  
 add_library(xmlrenderer xmlrenderer/xmllib.cpp xmlrenderer/taglib.hpp)
-target_link_libraries(xmlrenderer ${LibXML++_LIBRARIES} ${Boost_LIBRARIES} webpp-common)
+target_link_libraries(xmlrenderer ${LibXML++_LIBRARIES} ${LibXSLT_LIBRARIES} ${Boost_LIBRARIES} webpp-common)
 
 ENABLE_TESTING()
 
@@ -46,7 +47,7 @@ else()
 endif()
 
 add_executable(xmlrenderer-test tests/test.cpp xmlrenderer/xmllib.cpp xmlrenderer/taglib.hpp)
-target_link_libraries(xmlrenderer-test ${LibXML++_LIBRARIES} ${Boost_LIBRARIES} webpp-common)
+target_link_libraries(xmlrenderer-test ${LibXML++_LIBRARIES} ${LibXSLT_LIBRARIES} ${Boost_LIBRARIES} webpp-common)
 set_target_properties(xmlrenderer-test PROPERTIES COMPILE_FLAGS ${CoverageDefinitions} LINK_FLAGS ${CoverageLinkDefinitions})
 
 add_test(xmlrenderer-test ${xmlrenderer_BINARY_DIR}/test1)

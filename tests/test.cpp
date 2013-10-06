@@ -444,3 +444,17 @@ BOOST_AUTO_TEST_CASE(subview_insert) {
     );
 
 }
+
+BOOST_AUTO_TEST_CASE(xslt) {
+	BOOST_TEST_CHECKPOINT("Test 16: XSL stylesheets");
+
+	webpp::xml::context ctx(boost::filesystem::path(__FILE__).parent_path().string());
+	webpp::xml::render::context rnd;
+
+	auto f2 = ctx.get("xslt-test-result");
+	ctx.attach_xslt("xslt-test");
+	auto f1 = ctx.get("xslt-test");
+	const Glib::ustring sf1 = const_cast<xmlpp::Document*>(&f1.get_fragment().get_document())->write_to_string_formatted();
+	const Glib::ustring sf2 = const_cast<xmlpp::Document*>(&f2.get_fragment().get_document())->write_to_string_formatted();
+	BOOST_CHECK_EQUAL(sf1, sf2);
+}

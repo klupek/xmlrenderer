@@ -76,11 +76,12 @@ namespace webpp { namespace xml {
 
 	/// Load fragment from file 'filename', fragment name is filename
 	fragment::fragment(const Glib::ustring& filename, context& ctx)
-		: name_(filename), context_(ctx) {
+		: name_(filename), context_(ctx){
 		STACKED_EXCEPTIONS_ENTER();
 		reader_.set_substitute_entities(false);
 		reader_.set_validate(false);
 		reader_.parse_file(filename);
+		apply_stylesheets();
 		STACKED_EXCEPTIONS_LEAVE("parsing file '" + filename + "'");
 	}
 
@@ -91,7 +92,31 @@ namespace webpp { namespace xml {
 		reader_.set_substitute_entities(false);
 		reader_.set_validate(false);
 		reader_.parse_memory(buffer);
+		apply_stylesheets();
 		STACKED_EXCEPTIONS_LEAVE("parsing memory buffer named '" + name + "':<<XML\n" + buffer + "\nXML\n");
+	}
+
+	void fragment::apply_stylesheets() {
+		if(context_.get_stylesheets().empty())
+			return;
+
+		xmlDoc *current = reader_.get_document()->cobj(), *prev = nullptr;
+		for(const auto& stylesheet : context_.get_stylesheets()) {
+			const char* params[] = { nullptr };
+
+			if(prev != nullptr && prev != reader_.get_document()->cobj())
+				xmlFreeDoc(prev);
+
+			prev = current;
+			// TODO: handle errors (it is NOT easy, requires global state)
+			current = xsltApplyStylesheet(stylesheet.get(), prev, params);
+			if(current == nullptr) {
+				if(prev != reader_.get_document()->cobj())
+					xmlFreeDoc(prev);
+				throw std::runtime_error("Could not apply XSL stylesheet");
+			}
+		}
+		processed_document_.reset(new xmlpp::Document(current));
 	}
 
 	/// Return all nodes in fragment, matching given XPath expression
@@ -104,10 +129,10 @@ namespace webpp { namespace xml {
 		STACKED_EXCEPTIONS_ENTER();
         fragment_output result(fragment_.name());
 		xmlpp::Document& output = result.document();
-        xmlpp::Element* src = fragment_.reader().get_document()->get_root_node();
+		xmlpp::Element* src = fragment_.get_document().get_root_node();
 
         // copy children prev and next to root element, without processing (comments...)
-        for(xmlNode* i = fragment_.reader().get_document()->cobj()->children; i != src->cobj() && i != nullptr; i = i->next) {
+		for(xmlNode* i = fragment_.get_document().cobj()->children; i != src->cobj() && i != nullptr; i = i->next) {
             if(i->type == XML_COMMENT_NODE) {
                 xmlChar* comment = xmlNodeGetContent(i);
                 output.add_comment(Glib::ustring(reinterpret_cast<const char*>(comment)));
@@ -134,6 +159,20 @@ namespace webpp { namespace xml {
 	/// Construct context; library_directory is directory root for fragment XML files
 	context::context(const std::string& library_directory)
 		: library_directory_(library_directory) {
+		// libxml global state for libxslt
+		xmlSubstituteEntitiesDefault(1);
+		xmlLoadExtDtdDefaultValue = 1;
+	}
+
+	void context::attach_xslt(const std::string& name) {
+		STACKED_EXCEPTIONS_ENTER();
+		const boost::filesystem::path filepath = library_directory_ / ( name + ".xsl" );
+		xsltStylesheetPtr ptr = xsltParseStylesheetFile(reinterpret_cast<const xmlChar*>(filepath.string().c_str()));
+		// TODO: make global state for xslt, attach error reporting functios, make it log...
+		if(ptr == nullptr)
+			throw std::runtime_error("xsltParseStyleSheet failed");
+		stylesheets_.emplace_back(ptr, xsltFreeStylesheet);
+		STACKED_EXCEPTIONS_LEAVE("attach xslt stylesheet " + name);
 	}
 
 	/// Load fragment 'name' from file in library
@@ -290,13 +329,13 @@ namespace webpp { namespace xml {
                             throw std::runtime_error("webpp://control:insert requires attribute value-prefix (prefix for render context variables)");
                         rnd.push_prefix(src->get_attribute("value-prefix")->get_value());
                         auto subdoc = context_.get(src->get_attribute("name")->get_value());
-                        subdoc.process_node(subdoc.get_fragment().reader().get_document()->get_root_node(), output, dst, rnd);
+						subdoc.process_node(subdoc.get_fragment().get_document().get_root_node(), output, dst, rnd);
                         rnd.pop_prefix();
                     } else if(view_insertion_iterator != view_insertions_.end()) {
                         rnd.push_prefix(view_insertion_iterator->second.value_prefix);
                         auto subdoc = context_.get(view_insertion_iterator->second.view_name);
 						subdoc.view_insertions_ = view_insertions_;
-                        subdoc.process_node(subdoc.get_fragment().reader().get_document()->get_root_node(), output, dst, rnd);
+						subdoc.process_node(subdoc.get_fragment().get_document().get_root_node(), output, dst, rnd);
 						dst->set_attribute("id", id_attribute->get_value());
                         rnd.pop_prefix();
                     } else {
