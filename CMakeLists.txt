@@ -5,16 +5,7 @@ cmake_minimum_required (VERSION 2.6)
 
 option(GENERATE_COVERAGE "(broken when using clang)")
 
-ADD_DEFINITIONS(
-    -std=c++11
-    -D_GLIBCXX_USE_NANOSLEEP=1
-    -Wall
-    -Wextra
-    -Wno-unused
-    -Wno-type-limits
-    -DBOOST_ALL_NO_LIB
-)
-
+set(LibDefinitions "-std=c++11 -Wall -Wextra -Wno-unused -Wno-type-limits -DBOOST_ALL_NO_LIB")
 SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
 SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")
 
@@ -35,15 +26,16 @@ INCLUDE_DIRECTORIES(${xmlrenderer_SOURCE_DIR}/webpp-common ${xmlrenderer_SOURCE_
  
 add_library(xmlrenderer xmlrenderer/xmllib.cpp xmlrenderer/taglib.hpp)
 target_link_libraries(xmlrenderer ${LibXML++_LIBRARIES} ${LibXSLT_LIBRARIES} ${Boost_LIBRARIES} webpp-common)
+set_target_properties(xmlrenderer PROPERTIES COMPILE_FLAGS "${LibDefinitions}")
 
 ENABLE_TESTING()
 
 if(GENERATE_COVERAGE)
 		set(CoverageDefinitions "-g -fprofile-arcs -ftest-coverage -DBOOST_TEST_DYN_LINK")
-		set(CoverageLinkDefinitions "-g -fprofile-arcs -ftest-coverage -DBOOST_TEST_DYN_LINK")
+		set(CoverageLinkDefinitions "-g -fprofile-arcs -ftest-coverage -DBOOST_TEST_DYN_LINK ${LibDefinitions}")
 else()
 		set(CoverageDefinitions "-DBOOST_TEST_DYN_LINK")
-		set(CoverageLinkDefinitions "-DBOOST_TEST_DYN_LINK")
+		set(CoverageLinkDefinitions "-DBOOST_TEST_DYN_LINK ${LibDefinitions}")
 endif()
 
 add_executable(xmlrenderer-test tests/test.cpp xmlrenderer/xmllib.cpp xmlrenderer/taglib.hpp)
