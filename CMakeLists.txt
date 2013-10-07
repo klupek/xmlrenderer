@@ -28,6 +28,10 @@ add_library(xmlrenderer xmlrenderer/xmllib.cpp xmlrenderer/taglib.hpp)
 target_link_libraries(xmlrenderer ${LibXML++_LIBRARIES} ${LibXSLT_LIBRARIES} ${Boost_LIBRARIES} webpp-common)
 set_target_properties(xmlrenderer PROPERTIES COMPILE_FLAGS "${LibDefinitions}")
 
+add_executable(renderproc xmlrenderer/renderproc.cpp xmlrenderer/xmllib.cpp)
+target_link_libraries(renderproc ${LibXML++_LIBRARIES} ${LibXSLT_LIBRARIES} ${Boost_LIBRARIES} webpp-common)
+set_target_properties(renderproc PROPERTIES COMPILE_FLAGS "${LibDefinitions}")
+
 ENABLE_TESTING()
 
 if(GENERATE_COVERAGE)
