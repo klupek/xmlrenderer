@@ -17,7 +17,12 @@ void parse_render_values(const std::map<std::string, std::string>& lines, webpp:
 		const std::size_t end = name.find(']');
 		if(beg == std::string::npos && end == std::string::npos) {
 			std::cerr << "Loaded " << name << " = " << value << std::endl;
-			rnd.find(name).create_value(value);
+			if(value == "true")
+				rnd.find(name).create_value(true);
+			else if(value == "false")
+				rnd.find(name).create_value(false);
+			else
+				rnd.find(name).create_value(value);
 		} else if(beg == std::string::npos || end == std::string::npos || end < beg) {
 			throw std::runtime_error("invalid render line: " + i->first + " = " + i->second);
 		} else {

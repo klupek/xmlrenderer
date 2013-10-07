@@ -283,6 +283,8 @@ namespace webpp { namespace xml {
 					visible &= !val.get_value().is_true();
 				} else
 					throw std::runtime_error("webpp://control atribute " + name + " is not implemented");
+				if(!visible && repeat_type != outer)
+					break;
 			}
 		} // foreach attribute
 
