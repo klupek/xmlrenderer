@@ -3,6 +3,7 @@
 #include <fstream>
 #include <vector>
 #include <boost/algorithm/string.hpp>
+#include <boost/date_time.hpp>
 
 void parse_render_values(const std::map<std::string, std::string>& lines, webpp::xml::render::tree_element& rnd) {
 	typedef std::map <std::string, std::string> array_element_lines;
@@ -16,7 +17,7 @@ void parse_render_values(const std::map<std::string, std::string>& lines, webpp:
 		const std::size_t beg = name.find('[');
 		const std::size_t end = name.find(']');
 		if(beg == std::string::npos && end == std::string::npos) {
-			std::cerr << "Loaded " << name << " = " << value << std::endl;
+			//std::cerr << "Loaded " << name << " = " << value << std::endl;
 			if(value == "true")
 				rnd.find(name).create_value(true);
 			else if(value == "false")
@@ -40,15 +41,21 @@ void parse_render_values(const std::map<std::string, std::string>& lines, webpp:
 	}
 	for(const auto& array_element : found_arrays) {
 		auto& arr = rnd.find(array_element.first).create_array();
-		std::cerr << "Created array " << array_element.first << std::endl;
+		//std::cerr << "Created array " << array_element.first << std::endl;
 		for(const auto& array_element_line : array_element.second) {
-			std::cerr << "Created array element in " << array_element.first << std::endl;
+			//std::cerr << "Created array element in " << array_element.first << std::endl;
 			parse_render_values(array_element_line.second, arr.add());
 		}
 	}
 }
 
 int main(int argc, char **argv) {
+	bool bench = false;
+	if(argc == 4 && !strcmp(argv[3], "bench")) {
+		bench = true;
+		--argc;
+	}
+
 	if(argc != 3) {
 		std::cerr << "Usage: " << argv[0] << " <render values file> <xml template file>\n";
 		return 1;
@@ -72,7 +79,21 @@ int main(int argc, char **argv) {
 			throw std::runtime_error("invalid render line: " + line);
 		lines.emplace(line.substr(0, p), line.substr(p+1));
 	}
-	webpp::xml::render::context rnd;
-	parse_render_values(lines, rnd.get(""));
-	std::cout << ctx.get("testfile").render(rnd).to_string() << std::endl;
+	if(bench) {
+		int n = 1e2, i = n;
+		webpp::xml::render::context rnd;
+		parse_render_values(lines, rnd.get(""));
+		auto now = boost::posix_time::microsec_clock::universal_time();
+		while(i--) {
+			std::string result = ctx.get("testfile").render(rnd).to_string();
+		}
+		auto later = boost::posix_time::microsec_clock::universal_time();
+		auto process_time = (later-now).ticks();
+		double perreq = (double)process_time/n/1000000;
+		std::cout << n << " rendered documents, total time " << (double)process_time/1000000 << " seconds, " << perreq << " per request\n";
+	} else {
+		webpp::xml::render::context rnd;
+		parse_render_values(lines, rnd.get(""));
+		std::cout << ctx.get("testfile").render(rnd).to_string() << std::endl;
+	}
 }
