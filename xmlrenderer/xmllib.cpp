@@ -281,6 +281,29 @@ namespace webpp { namespace xml {
 					const auto& val = rnd.get(value);
 					ctx_variable_check(src, name, value, val);
 					visible &= !val.get_value().is_true();
+				} else if(name == "if-false-or-empty") {
+					const auto& val = rnd.get(value);
+					visible &= (val.empty() || !val.get_value().is_true());
+				} else if(name == "if-is-array-with-one-element") {
+					const auto& val = rnd.get(value);
+					ctx_variable_check(src, name, value, val);
+					visible &= val.is_array();
+					if(visible) {
+						auto& arr = val.get_array();
+						arr.reset();
+						arr.next();
+						visible &= !arr.has_next();
+					}
+				} else if(name == "if-is-array-with-more-elements") {
+					const auto& val = rnd.get(value);
+					ctx_variable_check(src, name, value, val);
+					visible &= val.is_array();
+					if(visible) {
+						auto& arr = val.get_array();
+						arr.reset();
+						arr.next();
+						visible &= arr.has_next();
+					}
 				} else
 					throw std::runtime_error("webpp://control atribute " + name + " is not implemented");
 				if(!visible && repeat_type != outer)
