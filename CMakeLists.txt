@@ -28,9 +28,16 @@ add_library(xmlrenderer xmlrenderer/xmllib.cpp xmlrenderer/test_parser.cpp xmlre
 target_link_libraries(xmlrenderer ${LibXML++_LIBRARIES} ${LibXSLT_LIBRARIES} ${Boost_LIBRARIES} webpp-common)
 set_target_properties(xmlrenderer PROPERTIES COMPILE_FLAGS "${LibDefinitions}")
 
-add_executable(renderproc xmlrenderer/renderproc.cpp xmlrenderer/test_parser.cpp xmlrenderer/xmllib.cpp)
-target_link_libraries(renderproc ${LibXML++_LIBRARIES} ${LibXSLT_LIBRARIES} ${Boost_LIBRARIES} webpp-common)
+add_executable(renderproc xmlrenderer/renderproc.cpp)
+target_link_libraries(renderproc ${LibXML++_LIBRARIES} ${LibXSLT_LIBRARIES} ${Boost_LIBRARIES} webpp-common xmlrenderer)
 set_target_properties(renderproc PROPERTIES COMPILE_FLAGS "${LibDefinitions}")
+
+add_executable(parser_test xmlrenderer/parser_test.cpp)
+target_link_libraries(parser_test ${LibXML++_LIBRARIES} ${LibXSLT_LIBRARIES} ${Boost_LIBRARIES} webpp-common xmlrenderer)
+set_target_properties(parser_test PROPERTIES COMPILE_FLAGS "${LibDefinitions}")
+
+add_dependencies(parser_test xmlrenderer)
+add_dependencies(renderproc xmlrenderer)
 
 ENABLE_TESTING()
 
@@ -42,10 +49,12 @@ else()
 		set(CoverageLinkDefinitions "-DBOOST_TEST_DYN_LINK")
 endif()
 
-add_executable(xmlrenderer-test tests/test.cpp xmlrenderer/xmllib.cpp xmlrenderer/test_parser.cpp xmlrenderer/taglib.hpp)
-target_link_libraries(xmlrenderer-test ${LibXML++_LIBRARIES} ${LibXSLT_LIBRARIES} ${Boost_LIBRARIES} webpp-common)
+add_executable(xmlrenderer-test tests/test.cpp)
+target_link_libraries(xmlrenderer-test ${LibXML++_LIBRARIES} ${LibXSLT_LIBRARIES} ${Boost_LIBRARIES} webpp-common xmlrenderer)
 set_target_properties(xmlrenderer-test PROPERTIES COMPILE_FLAGS ${CoverageDefinitions} LINK_FLAGS ${CoverageLinkDefinitions})
 
 add_test(xmlrenderer-test ${xmlrenderer_BINARY_DIR}/test1)
+
+add_dependencies(xmlrenderer-test xmlrenderer)
 
 

@@ -147,6 +147,24 @@ namespace webpp { namespace xml { namespace expressions {
 		STACKED_EXCEPTIONS_LEAVE("evaluate test expression: " + expression);
 	}
 
+	void print_expression_ast(const std::string& expression) {
+		STACKED_EXCEPTIONS_ENTER()
+		using qi::phrase_parse;
+		using qi::ascii::space;
+		std::string::const_iterator saved = expression.begin(), begin = expression.begin(), end = expression.end();
+
+		expression_ptr ex;
+		bool r = phrase_parse(begin, end, expression_grammar(), space, ex);
+		if(begin != end || !r) {
+			throw std::runtime_error("Parse failed, stopped at character "
+									 + boost::lexical_cast<std::string>(begin-saved)
+									 + ": " + std::string(begin, end));
+		} else {
+			std::cout << ex->to_string();
+		}
+		STACKED_EXCEPTIONS_LEAVE("evaluate test expression: " + expression);
+	}
+
 	expression_grammar::expression_grammar()
 			: expression_grammar::base_type(result) {
 			using qi::lit;
@@ -173,11 +191,12 @@ namespace webpp { namespace xml { namespace expressions {
 			char const* quote = "'";
 			operands2.add("=",base::operand::EQ)("!=",base::operand::NE)("<=",base::operand::LE)("<",base::operand::LT)(">=",base::operand::GE)(">",base::operand::GT);
 			operands1.add("is true", base::operand::IS_TRUE)("is empty", base::operand::IS_EMPTY)
-					("is not true", base::operand::IS_NOT_TRUE)("is not empty", base::operand::IS_NOT_EMPTY)
+					("is not true", base::operand::IS_NOT_TRUE)("is false", base::operand::IS_NOT_TRUE)
+					("is not empty", base::operand::IS_NOT_EMPTY)
 					("is null",base::operand::IS_NULL)("is not null", base::operand::IS_NOT_NULL);
 
 			literal_rule = ( p(quote) );
-			variable_rule = ( ( qi::lower | qi::upper ) >> *( char_('.') | qi::alnum ) );
+			variable_rule = ( ( qi::lower | qi::upper | char_('_') ) >> *( char_('.') | qi::alnum  | char_('_') | char_('-')) );
 
 			result %= expr;
 
@@ -333,7 +352,7 @@ namespace webpp { namespace xml { namespace expressions {
 			auto& v = rnd.get(variable_);
 			if(!v.is_array())
 				throw std::runtime_error("size(): variable is not array: " + variable_);
-			return value_t { value_t::type_t::integer, v.get_array().size() };
+			return value_t { value_t::type_t::integer, static_cast<int>(v.get_array().size()) };
 
 		} else {
 			throw std::runtime_error("Unknown function " + function_ + ": " + variable_ + "." + function_ + "()");
@@ -384,14 +403,10 @@ namespace webpp { namespace xml { namespace expressions {
 					return t.is_array() || t.is_value();
 
 				case base::operand::IS_NOT_EMPTY:
-					if(!t.is_array())
-						throw error(base::operand_name(op_), lhs_->to_string(), "Expected array");
-					return !t.get_array().empty();
+					return t.is_array() && !t.get_array().empty();
 
 				case base::operand::IS_EMPTY:
-					if(!t.is_array())
-						throw error(base::operand_name(op_), lhs_->to_string(), "Expected array");
-					return t.get_array().empty();
+					return !t.is_array() || t.get_array().empty();
 
 				case base::operand::IS_TRUE:
 					if(!t.is_value())
@@ -424,10 +439,11 @@ namespace webpp { namespace xml { namespace expressions {
 	}
 
 	template<typename T>
-	bool cast_and_compare_impl(const base::operand op, const base::value_t& lhs, const base::value_t& rhs) {
+	bool cast_and_compare_impl(const base::operand op, const base::value_t& lhs, const base::value_t& rhs, const std::string& stringrep) {
 		try {
 			const T l = boost::any_cast<T>(lhs.value_);
 			const T r = boost::any_cast<T>(rhs.value_);
+			//std::cout << "op " << base::operand_name(op) << ": " << l << ", " << r << std::endl;
 			switch(op) {
 				case base::operand::EQ: return l == r;
 				case base::operand::NE: return l != r;
@@ -439,15 +455,15 @@ namespace webpp { namespace xml { namespace expressions {
 
 			}
 		} catch(const boost::bad_any_cast& e) {
-			throw error(base::operand_name(op), "", e.what());
+			throw error("cast_and_compare_impl", stringrep, e.what());
 		}
 	}
 
-	bool cast_and_compare(const base::operand op, const base::value_t::type_t type, const base::value_t& lhs, const base::value_t& rhs) {
+	bool cast_and_compare(const base::operand op, const base::value_t::type_t type, const base::value_t& lhs, const base::value_t& rhs, const std::string& stringrep) {
 		switch(type) {
-			case base::value_t::type_t::integer: return cast_and_compare_impl<int>(op, rhs, lhs);
-			case base::value_t::type_t::real: return cast_and_compare_impl<double>(op, rhs, lhs);
-			case base::value_t::type_t::string: return cast_and_compare_impl<std::string>(op, rhs, lhs);
+			case base::value_t::type_t::integer: return cast_and_compare_impl<int>(op, lhs, rhs, stringrep);
+			case base::value_t::type_t::real: return cast_and_compare_impl<double>(op, lhs, rhs, stringrep);
+			case base::value_t::type_t::string: return cast_and_compare_impl<std::string>(op, lhs, rhs, stringrep);
 			default: throw std::logic_error("cast_and_compare should not be called with type=unknown");
 		}
 	}
@@ -463,17 +479,17 @@ namespace webpp { namespace xml { namespace expressions {
 					// two variables, no other way then compare string representation of them
 					// TODO: virtual equal() for render::value?
 					if(rhs.type == lhs.type) {
-						return cast_and_compare_impl<std::string>(op_, lhs, rhs);
+						return cast_and_compare_impl<std::string>(op_, lhs, rhs, to_string());
 					} else if(rhs.type == value_t::type_t::unknown) {
 						// left is known, right is unknown, cast right to left's type
-						return cast_and_compare(op_, lhs.type, lhs, rhs);
+						return cast_and_compare(op_, lhs.type, lhs, rhs, to_string());
 					} else {
 						// right is known, left is unknonw, cast left to right's type
-						return cast_and_compare(op_, rhs.type, lhs, rhs);
+						return cast_and_compare(op_, rhs.type, lhs, rhs, to_string());
 					}
 				} else if(rhs.type == lhs.type) {
 					// known type on both sides
-					return cast_and_compare(op_, rhs.type, lhs, rhs);
+					return cast_and_compare(op_, rhs.type, lhs, rhs, to_string());
 				} else {
 					// different types on right and left side
 					throw std::runtime_error("Could not use operator " + base::operand_name(op_) + " on different types: "

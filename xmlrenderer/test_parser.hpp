@@ -83,6 +83,7 @@ namespace expressions {
 	};
 
 	bool evaluate_test_expression(const std::string& expression, render::context& rnd);
+	void print_expression_ast(const std::string& expression);
 }}}
 
 #endif // WEBPP_XML_TEST_PARSER_HPP
