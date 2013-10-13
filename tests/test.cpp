@@ -152,7 +152,7 @@ BOOST_AUTO_TEST_CASE(taglib_format) {
 
 	// if-(not)-exists combination
 
-	ctx.put("testek3", "<rootnode xmlns=\"webpp://xml\" xmlns:f=\"webpp://format\" xmlns:c=\"webpp://control\"><f:b c:if-exists=\"testval2\">#{testval2|%.3f}</f:b><b c:if-not-exists=\"testval2\">bezcenne</b></rootnode>");
+	ctx.put("testek3", "<rootnode xmlns=\"webpp://xml\" xmlns:f=\"webpp://format\" xmlns:c=\"webpp://control\"><f:b c:visible-if=\"testval2 is not null\">#{testval2|%.3f}</f:b><b c:visible-if=\"testval2 is null\">bezcenne</b></rootnode>");
 	BOOST_CHECK_EQUAL(ctx.get("testek3").render(rnd).xml().to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode><b>bezcenne</b></rootnode>\n");
 
 	rnd.create_value("testval2", 12.34567);
@@ -202,28 +202,28 @@ BOOST_AUTO_TEST_CASE(ctrl_visibility) {
 	texcept(ctx.get("testek").render(rnd), webpp::stacked_exception, "webpp://control atribute if-egzists is not implemented");
 
 	// testval is not set, but won't be evaulated - element is not visible
-	ctx.put("testek", "<rootnode xmlns=\"webpp://xml\" xmlns:c=\"webpp://control\" xmlns:f=\"webpp://format\">foobar!<b c:if-exists=\"testval\" f:title=\"#{testval}\">test <!-- test2 --> <i><f:text>#{testval}</f:text></i></b>foobaz!</rootnode>");
+	ctx.put("testek", "<rootnode xmlns=\"webpp://xml\" xmlns:c=\"webpp://control\" xmlns:f=\"webpp://format\">foobar!<b c:visible-if=\"testval is not null\" f:title=\"#{testval}\">test <!-- test2 --> <i><f:text>#{testval}</f:text></i></b>foobaz!</rootnode>");
 	BOOST_CHECK_EQUAL(ctx.get("testek").render(rnd).xml().to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode>foobar!foobaz!</rootnode>\n");
 
 	rnd.create_value("testval", 42);
 	BOOST_CHECK_EQUAL(ctx.get("testek").render(rnd).xml().to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode>foobar!<b title=\"42\">test <!-- test2 --> <i>42</i></b>foobaz!</rootnode>\n");
 
-	ctx.put("testek", "<rootnode xmlns=\"webpp://xml\" xmlns:c=\"webpp://control\" xmlns:f=\"webpp://format\"><b c:if-not-exists=\"testval2\">testval2 is not set</b><f:b c:if-exists=\"testval2\">testval value is #{testval2}</f:b></rootnode>");
+	ctx.put("testek", "<rootnode xmlns=\"webpp://xml\" xmlns:c=\"webpp://control\" xmlns:f=\"webpp://format\"><b c:visible-if=\"testval2 is null\">testval2 is not set</b><f:b c:visible-if=\"testval2 is not null\">testval value is #{testval2}</f:b></rootnode>");
 	BOOST_CHECK_EQUAL(ctx.get("testek").render(rnd).xml().to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode><b>testval2 is not set</b></rootnode>\n");
 
 	rnd.create_value("testval2", "abuse");
 	BOOST_CHECK_EQUAL(ctx.get("testek").render(rnd).xml().to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode><b>testval value is abuse</b></rootnode>\n");
 
 	// if-true missing variable
-	ctx.put("testek", "<rootnode xmlns=\"webpp://xml\" xmlns:c=\"webpp://control\" xmlns:f=\"webpp://format\"><b c:if-true=\"testval3\">foo</b></rootnode>");
-	texcept(ctx.get("testek").render(rnd), webpp::stacked_exception, "variable 'testval3' required from <b> at line 1, attribute if-true, is missing");
+	ctx.put("testek", "<rootnode xmlns=\"webpp://xml\" xmlns:c=\"webpp://control\" xmlns:f=\"webpp://format\"><b c:visible-if=\"testval3 is true\">foo</b></rootnode>");
+	texcept(ctx.get("testek").render(rnd), webpp::stacked_exception, "Expression error: Expected boolean value\n1. At token is_true(value = variable(testval3))\n");
 
 	// if-true on non-boolean value
 	rnd.create_value("testval3", 42);
-	texcept(ctx.get("testek").render(rnd), webpp::stacked_exception, "render::value<i>::is_true(): '42' is not a boolean");
+	texcept(ctx.get("testek").render(rnd), webpp::stacked_exception, "Expression error: render::value<i>::is_true(): '42' is not a boolean\n1. At token is_true(value = variable(testval3))\n");
 
 	// if-(not)-true cascade test
-	ctx.put("testek", "<rootnode xmlns=\"webpp://xml\" xmlns:c=\"webpp://control\" xmlns:f=\"webpp://format\"><b c:if-true=\"testval3\"><i c:if-not-true=\"testval4\">foo</i>bar</b><b c:if-not-true=\"testval3\"><i c:if-true=\"testval4\">foo</i>baz</b></rootnode>");
+	ctx.put("testek", "<rootnode xmlns=\"webpp://xml\" xmlns:c=\"webpp://control\" xmlns:f=\"webpp://format\"><b c:visible-if=\"testval3 is true\"><i c:visible-if=\"testval4 is not true\">foo</i>bar</b><b c:visible-if=\"testval3 is not true\"><i c:visible-if=\"testval4 is true\">foo</i>baz</b></rootnode>");
 	rnd.create_value("testval3", true);
 	rnd.create_value("testval4", false);
 
@@ -237,7 +237,7 @@ BOOST_AUTO_TEST_CASE(ctrl_visibility) {
 	rnd.create_value("testval4", true);
 	BOOST_CHECK_EQUAL(ctx.get("testek").render(rnd).xml().to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode><b>bar</b></rootnode>\n");
 
-	ctx.put("testek", "<rootnode xmlns=\"webpp://xml\" xmlns:c=\"webpp://control\" xmlns:f=\"webpp://format\"><f:text c:if-true=\"testval3\">#{testval3}</f:text></rootnode>");
+	ctx.put("testek", "<rootnode xmlns=\"webpp://xml\" xmlns:c=\"webpp://control\" xmlns:f=\"webpp://format\"><f:text c:visible-if=\"testval3 is true\">#{testval3}</f:text></rootnode>");
 	BOOST_CHECK_EQUAL(ctx.get("testek").render(rnd).xml().to_string(), "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<rootnode>1</rootnode>\n");
 
 	rnd.create_value("testval3", false);
@@ -346,6 +346,7 @@ BOOST_AUTO_TEST_CASE(render_lazy_array) {
 		virtual void reset() {
 			x = 0; y = 1;
 		}
+		virtual size_t size() const { return 3; }
 	};
 
 	rnd.get("abuserzy").create_array<test_dynamic_array>();

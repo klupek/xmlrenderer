@@ -139,6 +139,7 @@ namespace webpp { namespace xml {
 			virtual bool has_next() const = 0;
 			virtual bool empty() const = 0;
 			virtual void reset() = 0;
+			virtual size_t size() const = 0;
             virtual ~array_base() {}
 		};
 
@@ -160,6 +161,7 @@ namespace webpp { namespace xml {
             virtual bool has_next() const;
             virtual bool empty() const;
             virtual void reset();
+			virtual size_t size() const;
 		};
 
 		//! \brief Storage node for values used for rendering XML fragment(s)

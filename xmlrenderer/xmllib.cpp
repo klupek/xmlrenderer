@@ -15,6 +15,8 @@ extern "C" {
 	#include <libxml/xpath.h>
 }
 
+#include "test_parser.hpp"
+
 namespace webpp { namespace xml { 
 	fragment_output::fragment_output(const Glib::ustring& name)
         : name_(name), output_(new xmlpp::Document), remove_xml_declaration_(false) {
@@ -267,43 +269,8 @@ namespace webpp { namespace xml {
 				} else if(name == "repeat-variable") {
 					repeat_variable = value;
 				// element visibility
-				} else if(name == "if-exists") {
-					const auto& val = rnd.get(value);
-					visible &= (!val.empty());
-				} else if(name == "if-not-exists") {
-					const auto& val = rnd.get(value);
-					visible &= val.empty();
-				} else if(name == "if-true") {
-					const auto& val = rnd.get(value);
-					ctx_variable_check(src, name, value, val);
-					visible &= val.get_value().is_true();
-				} else if(name == "if-not-true") {
-					const auto& val = rnd.get(value);
-					ctx_variable_check(src, name, value, val);
-					visible &= !val.get_value().is_true();
-				} else if(name == "if-false-or-empty") {
-					const auto& val = rnd.get(value);
-					visible &= (val.empty() || !val.get_value().is_true());
-				} else if(name == "if-is-array-with-one-element") {
-					const auto& val = rnd.get(value);
-					ctx_variable_check(src, name, value, val);
-					visible &= val.is_array();
-					if(visible) {
-						auto& arr = val.get_array();
-						arr.reset();
-						arr.next();
-						visible &= !arr.has_next();
-					}
-				} else if(name == "if-is-array-with-more-elements") {
-					const auto& val = rnd.get(value);
-					ctx_variable_check(src, name, value, val);
-					visible &= val.is_array();
-					if(visible) {
-						auto& arr = val.get_array();
-						arr.reset();
-						arr.next();
-						visible &= arr.has_next();
-					}
+				} else if(name == "visible-if") {
+					visible &= expressions::evaluate_test_expression(value, rnd);
 				} else
 					throw std::runtime_error("webpp://control atribute " + name + " is not implemented");
 				if(!visible && repeat_type != outer)
@@ -460,6 +427,10 @@ namespace webpp { namespace xml {
     void render::array::reset() {
         it_ = elements_.begin();
     }
+
+	size_t render::array::size() const {
+		return elements_.size();
+	}
 
     //! \brief Remove link from this node (used with imported and lazy tree nodes)
     void render::tree_element::remove_link() {

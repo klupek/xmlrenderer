@@ -5,7 +5,7 @@ cmake_minimum_required (VERSION 2.6)
 
 option(GENERATE_COVERAGE "(broken when using clang)")
 
-set(LibDefinitions "-std=c++11 -Wall -Wextra -Wno-unused -Wno-type-limits -DBOOST_ALL_NO_LIB")
+set(LibDefinitions "-std=c++11 -Wall -Wextra -Wno-unused -Wno-type-limits -DBOOST_ALL_NO_LIB -DBOOST_SPIRIT_USE_PHOENIX_V3")
 SET(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
 SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")
 
@@ -24,11 +24,11 @@ link_directories(${xmlrenderer_BINARY_DIR}/webpp-common)
 
 INCLUDE_DIRECTORIES(${xmlrenderer_SOURCE_DIR}/webpp-common ${xmlrenderer_SOURCE_DIR} ${LibXML++_INCLUDE_DIRS} ${LibXSLT_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS})
  
-add_library(xmlrenderer xmlrenderer/xmllib.cpp xmlrenderer/taglib.hpp)
+add_library(xmlrenderer xmlrenderer/xmllib.cpp xmlrenderer/test_parser.cpp xmlrenderer/taglib.hpp)
 target_link_libraries(xmlrenderer ${LibXML++_LIBRARIES} ${LibXSLT_LIBRARIES} ${Boost_LIBRARIES} webpp-common)
 set_target_properties(xmlrenderer PROPERTIES COMPILE_FLAGS "${LibDefinitions}")
 
-add_executable(renderproc xmlrenderer/renderproc.cpp xmlrenderer/xmllib.cpp)
+add_executable(renderproc xmlrenderer/renderproc.cpp xmlrenderer/test_parser.cpp xmlrenderer/xmllib.cpp)
 target_link_libraries(renderproc ${LibXML++_LIBRARIES} ${LibXSLT_LIBRARIES} ${Boost_LIBRARIES} webpp-common)
 set_target_properties(renderproc PROPERTIES COMPILE_FLAGS "${LibDefinitions}")
 
@@ -42,7 +42,7 @@ else()
 		set(CoverageLinkDefinitions "-DBOOST_TEST_DYN_LINK")
 endif()
 
-add_executable(xmlrenderer-test tests/test.cpp xmlrenderer/xmllib.cpp xmlrenderer/taglib.hpp)
+add_executable(xmlrenderer-test tests/test.cpp xmlrenderer/xmllib.cpp xmlrenderer/test_parser.cpp xmlrenderer/taglib.hpp)
 target_link_libraries(xmlrenderer-test ${LibXML++_LIBRARIES} ${LibXSLT_LIBRARIES} ${Boost_LIBRARIES} webpp-common)
 set_target_properties(xmlrenderer-test PROPERTIES COMPILE_FLAGS ${CoverageDefinitions} LINK_FLAGS ${CoverageLinkDefinitions})
 
