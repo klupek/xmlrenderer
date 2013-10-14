@@ -366,9 +366,12 @@ namespace webpp { namespace xml {
 
 				auto& array = rnd.get(repeat_array).get_array();
 				array.reset();
+				int index = 0;
 				while(array.has_next()) {
+					rnd.get(repeat_variable + "-index").create_value(index);
 					rnd.import_subtree(repeat_variable, array.next());
                     process_children(src, output, dst, rnd);
+					++index;
 				}
 			}
 		} else { // repeat_type == outer
@@ -384,13 +387,16 @@ namespace webpp { namespace xml {
 				dst->get_parent()->remove_child(dst);
 			else {
 				xmlpp::Element* currentdst = dst;
+				int index = 0;
 				while(array.has_next()) {
 					// first setup context variable
 					rnd.import_subtree(repeat_variable, array.next());
+					rnd.get(repeat_variable + "-index").create_value(index);
                     process_node(src, output, currentdst, rnd, true);
 					// move to next source array element, if it is not end, then add next sibling
 					if(array.has_next())
 						currentdst = currentdst->get_parent()->add_child(src->get_name());
+					++index;
 				}
 			}
         } // if repeat_type

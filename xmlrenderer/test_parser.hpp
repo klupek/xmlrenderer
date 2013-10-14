@@ -38,6 +38,8 @@ namespace expressions {
 				GT, // 'expr > expr', as above
 				GE, // 'expr >= expr', as above
 
+				IN, // element in array
+
 				IS_TRUE, // 'expr is true', expr must be bool
 				IS_NOT_TRUE,
 				IS_EMPTY, // 'expr is empty', expr can be anything
