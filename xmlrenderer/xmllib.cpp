@@ -270,7 +270,8 @@ namespace webpp { namespace xml {
 					repeat_variable = value;
 				// element visibility
 				} else if(name == "visible-if") {
-					visible &= expressions::evaluate_test_expression(value, rnd);
+					if( repeat_type != outer || already_processing_outer_repeat )
+						visible &= expressions::evaluate_test_expression(value, rnd);
 				} else
 					throw std::runtime_error("webpp://control atribute " + name + " is not implemented");
 				if(!visible && repeat_type != outer)
@@ -386,16 +387,16 @@ namespace webpp { namespace xml {
 			if(array.empty())
 				dst->get_parent()->remove_child(dst);
 			else {
-				xmlpp::Element* currentdst = dst;
+				xmlpp::Element* currentdst = dst, *parent = dst->get_parent();
 				int index = 0;
 				while(array.has_next()) {
 					// first setup context variable
 					rnd.import_subtree(repeat_variable, array.next());
-					rnd.get(repeat_variable + "-index").create_value(index);
+					rnd.get(repeat_variable	 + "-index").create_value(index);
                     process_node(src, output, currentdst, rnd, true);
 					// move to next source array element, if it is not end, then add next sibling
 					if(array.has_next())
-						currentdst = currentdst->get_parent()->add_child(src->get_name());
+						currentdst = parent->add_child(src->get_name());
 					++index;
 				}
 			}

@@ -226,11 +226,11 @@ namespace webpp { namespace xml { namespace expressions {
 					| int_ [ _val = construct<expression_ptr>(new_<integer_expression>(_1)) ];
 
 			expr =
-					( atom >> +space >> lit("in") >> +space >> atom >> +space >> lit("as") >> +space >> atom )
+					( lit("not") >> *space >> lit('(') >> *space >> or_rule >> *space >> lit(")") ) [ _val = construct<expression_ptr>(new_<not_expression>(_3)) ]
+					| ( atom >> +space >> lit("in") >> +space >> atom >> +space >> lit("as") >> +space >> atom )
 						[ _val = construct<expression_ptr>(new_<threeop_expression>(base::operand::IN, _1, _4, _7))]
 					| ( atom >> +space >> lit("in") >> +space >> atom )
 						[ _val = construct<expression_ptr>(new_<threeop_expression>(base::operand::IN, _1, _4))]
-					| ( lit("not") >> *space >> lit('(') >> or_rule >> *space >> lit(")") ) [ _val = construct<expression_ptr>(new_<not_expression>(_2)) ]
 					| ( lit('(') >> *space >> or_rule >> *space >> lit(')') ) [ _val = _2 ]
 					| ( atom >> +space >> operands1 ) [ _val = construct<expression_ptr>(new_<oneop_expression>(_1, _3)) ]
 					| ( atom >> *space >> operands2 >> *space >> atom ) [ _val = construct<expression_ptr>(new_<twoop_expression>(_1, _3, _5)) ];
@@ -567,7 +567,7 @@ namespace webpp { namespace xml { namespace expressions {
 				if(left.type == value_t::type_t::unknown)
 					compare_type = value_t::type_t::string;
 				while(array.has_next()) {
-					const value_t element { value_t::type_t::unknown, array.next().find(suffix).get_value().output() };
+					const value_t element { value_t::type_t::unknown, std::string(array.next().find(suffix).get_value().output()) };
 
 					if(cast_and_compare(base::operand::EQ, compare_type, left, element, to_string()))
 						return true;
@@ -576,21 +576,21 @@ namespace webpp { namespace xml { namespace expressions {
 			} else
 				throw std::runtime_error("Operand not supported: " + base::operand_name(op_));
 		} catch(const error& e) {
-			throw error(base::operand_name(op_), first_->to_string() + "," + second_->to_string() + "," + third_->to_string(), e);
+			throw error(base::operand_name(op_), first_->to_string() + "," + second_->to_string() + "," + ( third_ ? third_->to_string() : std::string("null") ), e);
 		} catch(const std::runtime_error& e) {
-			throw error(base::operand_name(op_), first_->to_string() + "," + second_->to_string() + "," + third_->to_string(), e);
+			throw error(base::operand_name(op_), first_->to_string() + "," + second_->to_string() + "," + ( third_ ? third_->to_string() : std::string("null") ), e);
 		}
 	}
 
 	render::tree_element& threeop_expression::get_tree_element(render::context&) const {
-		throw error(base::operand_name(op_), first_->to_string() + "," + second_->to_string() + "," + third_->to_string(), "Expected variable");
+		throw error(base::operand_name(op_), first_->to_string() + "," + second_->to_string() + "," + ( third_ ? third_->to_string() : std::string("null") ), "Expected variable");
 	}
 
 	base::value_t threeop_expression::get_value(render::context &) const {
-		throw error(base::operand_name(op_), first_->to_string() + "," + second_->to_string() + "," + third_->to_string(), "Expected atom");
+		throw error(base::operand_name(op_), first_->to_string() + "," + second_->to_string() + "," + ( third_ ? third_->to_string() : std::string("null") ), "Expected atom");
 	}
 
-	std::string threeop_expression::to_string() const { return operand_name(op_) + "(" + first_->to_string() + "," + second_->to_string() + "," + third_->to_string() + ")"; }
+	std::string threeop_expression::to_string() const { return operand_name(op_) + "(" + first_->to_string() + "," + second_->to_string() + "," + ( third_ ? third_->to_string() : std::string("null") ) + ")"; }
 
 	and_expression::and_expression(expression_ptr lhs, expression_ptr rhs)
 			: lhs_(lhs), rhs_(rhs) {}

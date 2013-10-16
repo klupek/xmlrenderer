@@ -92,8 +92,13 @@ int main(int argc, char **argv) {
 		double perreq = (double)process_time/n/1000000;
 		std::cout << n << " rendered documents, total time " << (double)process_time/1000000 << " seconds, " << perreq << " per request\n";
 	} else {
-		webpp::xml::render::context rnd;
-		parse_render_values(lines, rnd.get(""));
-		std::cout << ctx.get("testfile").render(rnd).to_string() << std::endl;
+		try {
+			webpp::xml::render::context rnd;
+			parse_render_values(lines, rnd.get(""));
+			std::cout << ctx.get("testfile").render(rnd).to_string() << std::endl;
+		} catch(const webpp::stacked_exception& e) {
+			std::cerr << e.format();
+			throw;
+		}
 	}
 }
