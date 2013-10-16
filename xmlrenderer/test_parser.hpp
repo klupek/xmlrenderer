@@ -85,6 +85,7 @@ namespace expressions {
 	};
 
 	bool evaluate_test_expression(const std::string& expression, render::context& rnd);
+	std::string evaluate_string_expression(const std::string& expression, render::context& rnd);
 	void print_expression_ast(const std::string& expression);
 }}}
 

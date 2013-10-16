@@ -2,6 +2,7 @@
 #define WEBPP_XMLRENDERER_TAGLIB_HPP
 
 #include "xmllib.hpp"
+#include "test_parser.hpp"
 #include <webpp-common/stacked_exception.hpp>
 namespace webpp { namespace xml { namespace taglib {
 	/*! \brief XMLNS handler for formatting attributes
@@ -31,10 +32,7 @@ namespace webpp { namespace xml { namespace taglib {
 					result << var.get_value().format(format);
 				} else {
 					auto variable = source.substr(start+2, end-start-2);
-					auto& var = ctx.get(variable);
-					if(!var.is_value())
-						throw std::runtime_error("output: required variable '" + variable + "' not found in render context");
-					result << var.get_value().output();
+					result << expressions::evaluate_string_expression(variable, ctx);
 				}
 				last = end+1;
 			}

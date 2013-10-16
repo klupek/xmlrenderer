@@ -90,8 +90,9 @@ namespace webpp { namespace xml {
 		: name_(filename), context_(ctx){
 		STACKED_EXCEPTIONS_ENTER();
 		reader_.set_substitute_entities(false);
-		reader_.set_validate(false);
-		reader_.parse_file(filename);
+		reader_.set_validate(false);		
+		reader_.parse_file(filename);		
+		reader_.get_document()->get_root_node()->set_namespace_declaration("webpp://control", "webpp_control");
 		apply_stylesheets();
 		STACKED_EXCEPTIONS_LEAVE("parsing file '" + filename + "'");
 	}
@@ -103,6 +104,7 @@ namespace webpp { namespace xml {
 		reader_.set_substitute_entities(false);
 		reader_.set_validate(false);
 		reader_.parse_memory(buffer);
+		reader_.get_document()->get_root_node()->set_namespace_declaration("webpp://control", "webpp_control");
 		apply_stylesheets();
 		STACKED_EXCEPTIONS_LEAVE("parsing memory buffer named '" + name + "':<<XML\n" + buffer + "\nXML\n");
 	}
@@ -238,7 +240,7 @@ namespace webpp { namespace xml {
 	}
 
 
-    void prepared_fragment::process_node(const xmlpp::Element* src, xmlpp::Document& output, xmlpp::Element* dst, render::context& rnd, bool already_processing_outer_repeat) {
+	void prepared_fragment::process_node(const xmlpp::Element* src, xmlpp::Document& output, xmlpp::Element* dst, render::context& rnd, bool already_processing_outer_repeat) {
 		STACKED_EXCEPTIONS_ENTER();
 
 		Glib::ustring repeat_variable, repeat_array;
@@ -272,6 +274,8 @@ namespace webpp { namespace xml {
 				} else if(name == "visible-if") {
 					if( repeat_type != outer || already_processing_outer_repeat )
 						visible &= expressions::evaluate_test_expression(value, rnd);
+				} else if(name == "repeat-once") {
+					// handled in process_children
 				} else
 					throw std::runtime_error("webpp://control atribute " + name + " is not implemented");
 				if(!visible && repeat_type != outer)
@@ -371,7 +375,7 @@ namespace webpp { namespace xml {
 				while(array.has_next()) {
 					rnd.get(repeat_variable + "-index").create_value(index);
 					rnd.import_subtree(repeat_variable, array.next());
-                    process_children(src, output, dst, rnd);
+					process_children(src, output, dst, rnd, index > 0);
 					++index;
 				}
 			}
@@ -404,13 +408,16 @@ namespace webpp { namespace xml {
         STACKED_EXCEPTIONS_LEAVE("node " + src->get_namespace_uri() + ":" + src->get_name() + " at line " + boost::lexical_cast<std::string>(src->get_line()));
 	}
 
-    void prepared_fragment::process_children(const xmlpp::Element* src, xmlpp::Document& output, xmlpp::Element* dst, render::context& rnd) {
+	void prepared_fragment::process_children(const xmlpp::Element* src, xmlpp::Document& output, xmlpp::Element* dst, render::context& rnd, bool direct_inside_inner) {
 		STACKED_EXCEPTIONS_ENTER();
 		for(auto child : src->get_children()) {
 			const xmlpp::Element* childelement = dynamic_cast<xmlpp::Element*>(child);
 			if(childelement != nullptr) {
-				xmlpp::Element* e = dst->add_child(child->get_name());				
-                process_node(childelement, output, e, rnd);
+				xmlpp::Attribute* attr = childelement->get_attribute("repeat-once","webpp_control");
+				if(!(direct_inside_inner && attr != nullptr && attr->get_value() == "yes")) {
+					xmlpp::Element* e = dst->add_child(child->get_name());
+					process_node(childelement, output, e, rnd);
+				}
 			} else {
 				dst->import_node(child);
 			} // if childelement != nullptr

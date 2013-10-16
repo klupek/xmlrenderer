@@ -125,6 +125,16 @@ namespace webpp { namespace xml { namespace expressions {
 			virtual std::string to_string() const;
 	};
 
+	struct inline_condition_expression : public base {
+		expression_ptr condition_, when_true_, when_false_;
+
+		inline_condition_expression(expression_ptr condition, expression_ptr when_true, expression_ptr when_false);
+		virtual bool evaluate(render::context& rnd) const;
+		virtual render::tree_element& get_tree_element(render::context&) const;
+		virtual value_t get_value(render::context &) const;
+		virtual std::string to_string() const;
+	};
+
 	unescaped_string::unescaped_string()
 	  : unescaped_string::base_type(unesc_str)
 	{
@@ -155,6 +165,33 @@ namespace webpp { namespace xml { namespace expressions {
 			return ex->evaluate(rnd);
 		}
 		STACKED_EXCEPTIONS_LEAVE("evaluate test expression: " + expression);
+	}
+
+	std::string evaluate_string_expression(const std::string& expression, render::context& rnd) {
+		STACKED_EXCEPTIONS_ENTER()
+		using qi::phrase_parse;
+		using qi::ascii::space;
+		std::string::const_iterator saved = expression.begin(), begin = expression.begin(), end = expression.end();
+
+		expression_ptr ex;
+		bool r = phrase_parse(begin, end, expression_grammar(), space, ex);
+		if(begin != end || !r) {
+			throw std::runtime_error("Parse failed, stopped at character "
+									 + boost::lexical_cast<std::string>(begin-saved)
+									 + ": " + std::string(begin, end));
+		} else {
+			const expressions::base::value_t v = ex->get_value(rnd);
+			switch(v.type) {
+				case expressions::base::value_t::type_t::string:
+				case expressions::base::value_t::type_t::unknown:
+					return boost::any_cast<std::string>(v.value_);
+				case expressions::base::value_t::type_t::integer:
+					return boost::lexical_cast<std::string>(boost::any_cast<int>(v.value_));
+				case expressions::base::value_t::type_t::real:
+					return boost::lexical_cast<std::string>(boost::any_cast<double>(v.value_));
+			}
+		}
+		STACKED_EXCEPTIONS_LEAVE("evaluate string expression: " + expression);
 	}
 
 	void print_expression_ast(const std::string& expression) {
@@ -189,7 +226,9 @@ namespace webpp { namespace xml { namespace expressions {
 			using qi::_3;
 			using qi::_4;
 			using qi::_5;
+			using qi::_6;
 			using qi::_7;
+			using qi::_8;
 			using boost::phoenix::push_back;
 			using boost::phoenix::construct;
 			using boost::phoenix::new_;
@@ -226,14 +265,17 @@ namespace webpp { namespace xml { namespace expressions {
 					| int_ [ _val = construct<expression_ptr>(new_<integer_expression>(_1)) ];
 
 			expr =
-					( lit("not") >> *space >> lit('(') >> *space >> or_rule >> *space >> lit(")") ) [ _val = construct<expression_ptr>(new_<not_expression>(_3)) ]
+					( lit("if") >> +space >> expr >> +space >> lit("then") >> +space >> atom >> +space >> lit("else") >> +space >> atom)
+						[ _val = construct<expression_ptr>(new_<inline_condition_expression>(_2, _5, _8))]
+					| ( lit("not") >> *space >> lit('(') >> *space >> or_rule >> *space >> lit(")") ) [ _val = construct<expression_ptr>(new_<not_expression>(_3)) ]
 					| ( atom >> +space >> lit("in") >> +space >> atom >> +space >> lit("as") >> +space >> atom )
 						[ _val = construct<expression_ptr>(new_<threeop_expression>(base::operand::IN, _1, _4, _7))]
 					| ( atom >> +space >> lit("in") >> +space >> atom )
 						[ _val = construct<expression_ptr>(new_<threeop_expression>(base::operand::IN, _1, _4))]
 					| ( lit('(') >> *space >> or_rule >> *space >> lit(')') ) [ _val = _2 ]
 					| ( atom >> +space >> operands1 ) [ _val = construct<expression_ptr>(new_<oneop_expression>(_1, _3)) ]
-					| ( atom >> *space >> operands2 >> *space >> atom ) [ _val = construct<expression_ptr>(new_<twoop_expression>(_1, _3, _5)) ];
+					| ( atom >> *space >> operands2 >> *space >> atom ) [ _val = construct<expression_ptr>(new_<twoop_expression>(_1, _3, _5)) ]
+					| atom [ _val = _1 ];
 
 			and_suffix = ( +space >> "and" >> +space >> expr ) [ _val = _3 ];
 			and_rule =
@@ -591,6 +633,27 @@ namespace webpp { namespace xml { namespace expressions {
 	}
 
 	std::string threeop_expression::to_string() const { return operand_name(op_) + "(" + first_->to_string() + "," + second_->to_string() + "," + ( third_ ? third_->to_string() : std::string("null") ) + ")"; }
+
+	inline_condition_expression::inline_condition_expression(expression_ptr condition, expression_ptr when_true, expression_ptr when_false)
+		: condition_(condition), when_true_(when_true), when_false_(when_false) {}
+	render::tree_element& inline_condition_expression::get_tree_element(render::context&) const {
+		throw error("if-then", condition_->to_string() + "," + when_true_->to_string() + "," + when_false_->to_string(), "Expected variable");
+	}
+
+	bool inline_condition_expression::evaluate(render::context &) const {
+		throw error("if-then", condition_->to_string() + "," + when_true_->to_string() + "," + when_false_->to_string(), "Expected boolean expression");
+	}
+	base::value_t inline_condition_expression::get_value(render::context & rnd) const {
+		if(condition_->evaluate(rnd)) {
+			return when_true_->get_value(rnd);
+		} else {
+			return when_false_->get_value(rnd);
+		}
+	}
+	std::string inline_condition_expression::to_string() const {
+		return "operator if-then(" + condition_->to_string() + "," + when_true_->to_string() + "," + when_false_->to_string() + ")";
+	}
+
 
 	and_expression::and_expression(expression_ptr lhs, expression_ptr rhs)
 			: lhs_(lhs), rhs_(rhs) {}

@@ -133,7 +133,7 @@ BOOST_AUTO_TEST_CASE(taglib_format) {
 	ctx.put("testek", "<rootnode xmlns=\"webpp://xml\" xmlns:f=\"webpp://format\"><b><f:text>#{testval}</f:text></b></rootnode>");
 
 	// lets try it first without value
-	texcept(ctx.get("testek").render(rnd), webpp::stacked_exception, "output: required variable 'testval' not found in render context");
+	texcept(ctx.get("testek").render(rnd), webpp::stacked_exception, "Variable is null: testval");
 
 	// then, with some value
 	rnd.create_value("testval", "abuser<>");
@@ -177,7 +177,7 @@ BOOST_AUTO_TEST_CASE(taglib_format_ns) {
 
 	// missing variable
 	ctx.put("testek", "<rootnode xmlns=\"webpp://xml\" xmlns:f=\"webpp://format\"><a f:href=\"/users/#{user.name}\" f:title=\"user #{user.name} - abuse level #{user.abuse|%.2f}, wiec to abuser\"/></rootnode>");
-	texcept(ctx.get("testek").render(rnd), webpp::stacked_exception, "output: required variable 'user.name' not found in render context");
+	texcept(ctx.get("testek").render(rnd), webpp::stacked_exception, "Variable is null: user.name");
 
 	// missing second variable
 	rnd.create_value("user.name", "asdf");
@@ -272,7 +272,7 @@ BOOST_AUTO_TEST_CASE(ctrl_inner_repeat) {
 
 
 	// missing level in inner repeat
-	texcept(ctx.get("testek").render(rnd), webpp::stacked_exception, "output: required variable 'abuser.level' not found in render context");
+	texcept(ctx.get("testek").render(rnd), webpp::stacked_exception, "Variable is null: abuser.level");
 
 	a.find("level").create_value(M_PI);
 	b.find("level").create_value(M_PI_4);
