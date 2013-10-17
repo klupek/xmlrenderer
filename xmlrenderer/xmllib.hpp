@@ -90,6 +90,14 @@ namespace webpp { namespace xml {
 		};
 
 		template<>
+		class value<const char*> : public value<Glib::ustring> {
+		public:
+			value(const char* v)
+				: value<Glib::ustring>(v) {}
+		};
+
+
+		template<>
 		class value<std::string> : public value<Glib::ustring> {
 		public:
 			inline value(const std::string& v)
